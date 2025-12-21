@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PNLE SmartCards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: 'var(--bg-app)',
+              surface: 'var(--bg-panel)',
+              primary: {
+                DEFAULT: 'rgb(var(--primary) / <alpha-value>)',
+                hover: 'rgb(var(--primary) / 0.8)',
+                foreground: '#ffffff',
+              },
+              accent: 'var(--accent)',
+              text: 'var(--text-main)',
+              'text-muted': 'var(--text-muted)',
+              border: 'var(--border-color)',
+            },
+            fontFamily: {
+              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
+              mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+            },
+            animation: {
+              'blob': 'blob 10s infinite',
+              'fade-in': 'fadeIn 0.5s ease-out',
+            },
+            keyframes: {
+              blob: {
+                '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+      :root {
+        /* Modern Violet/Indigo Theme - Less "Basic Blue" */
+        --bg-app: #f2f4f8;
+        --bg-panel: rgba(255, 255, 255, 0.65);
+        --primary: 99 102 241; /* Indigo 500 */
+        --accent: #8b5cf6; /* Violet 500 */
+        --text-main: #1e1b4b;
+        --text-muted: #64748b;
+        --border-color: rgba(255, 255, 255, 0.6);
+        --glass-shine: rgba(255, 255, 255, 0.5);
+      }
+
+      /* Sophisticated Dark Mode */
+      .dark {
+        --bg-app: #09090b; /* Zinc 950 - Deeper Black */
+        --bg-panel: rgba(24, 24, 27, 0.6);
+        --text-main: #fafafa;
+        --text-muted: #a1a1aa;
+        --border-color: rgba(255, 255, 255, 0.08);
+        --glass-shine: rgba(255, 255, 255, 0.03);
+      }
+
+      /* Crescere Theme (Luxury Rose) */
+      .theme-crescere {
+        --bg-app: #1a0b12;
+        --bg-panel: rgba(45, 20, 30, 0.5);
+        --primary: 244 63 94; /* Rose 500 */
+        --accent: #d946ef; /* Fuchsia 500 */
+        --text-main: #fff1f2;
+        --text-muted: #fecdd3;
+        --border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      body {
+        background-color: var(--bg-app);
+        color: var(--text-main);
+        transition: background-color 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+        /* Noise Texture for non-AI feel */
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+      }
+
+      /* Ultra-Modern Glassmorphism (Apple Style) */
+      .glass-panel {
+        background: var(--bg-panel);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--border-color);
+        box-shadow: 
+          0 4px 6px -1px rgba(0, 0, 0, 0.05),
+          0 10px 15px -3px rgba(0, 0, 0, 0.05),
+          inset 0 0 20px rgba(255, 255, 255, 0.05); /* Inner Glow */
+      }
+
+      .glass-input {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        backdrop-filter: blur(4px);
+        color: var(--text-main);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .glass-input:focus {
+        outline: none;
+        border-color: rgb(var(--primary));
+        background: rgba(var(--primary) / 0.05);
+        box-shadow: 0 0 0 1px rgb(var(--primary));
+      }
+      
+      .glass-input::placeholder {
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+
+      /* Typography Scales */
+      [data-font-size="small"] { font-size: 14px; }
+      [data-font-size="normal"] { font-size: 16px; }
+      [data-font-size="large"] { font-size: 18px; }
+      [data-font-size="extra-large"] { font-size: 20px; }
+
+      [data-font-family="serif"] body { font-family: 'Playfair Display', serif; }
+      [data-font-family="mono"] body { font-family: 'JetBrains Mono', monospace; }
+
+      .reduce-motion * {
+        animation: none !important;
+        transition: none !important;
+      }
+      
+      /* Utilities */
+      .perspective-1000 { perspective: 1000px; }
+      .transform-style-3d { transform-style: preserve-3d; }
+      .backface-hidden { backface-visibility: hidden; }
+      .rotate-y-180 { transform: rotateY(180deg); }
+      
+      /* Hide Scrollbar but allow scroll */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      
+      /* Smooth Scrollbar for custom areas */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
