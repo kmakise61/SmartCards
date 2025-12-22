@@ -47,11 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleResetDefaults = () => {
-      const month = new Date().toLocaleString('default', { month: 'long' });
-      const year = new Date().getFullYear();
-      const nextExamYear = TARGET_DATE.getFullYear();
       setTempTitle("Precision Board Review.");
-      setTempSubtitle(`Locked in for ${month} ${year} — Ready for ${nextExamYear}.`);
+      setTempSubtitle("LOCK IN!!");
   };
 
   return (
@@ -289,7 +286,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     ? 'bg-[#0f172a] border-slate-600 text-white focus:border-accent' 
                                     : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-accent'
                               }`}
-                              placeholder="e.g. December 2025 focus"
+                              placeholder="e.g. LOCK IN!!"
                           />
                           <div className="flex justify-end mt-1">
                               <span className={`text-[9px] font-mono ${tempSubtitle.length >= 80 ? 'text-red-500' : 'text-text-secondary opacity-40'}`}>

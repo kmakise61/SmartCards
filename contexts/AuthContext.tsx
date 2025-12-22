@@ -6,6 +6,7 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     sendPasswordResetEmail,
+    updateProfile,
     User
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
@@ -18,6 +19,7 @@ interface AuthContextType {
     signupWithEmail: (email: string, pass: string) => Promise<void>;
     logout: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
+    updateDisplayName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +62,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await sendPasswordResetEmail(auth, email);
     };
 
+    const updateDisplayName = async (name: string) => {
+        if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { displayName: name });
+            // Force refresh local state since auth listener might not fire immediately for profile updates
+            setCurrentUser({ ...auth.currentUser, displayName: name });
+        }
+    };
+
     return (
         <AuthContext.Provider value={{ 
             currentUser, 
@@ -68,7 +78,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             loginWithEmail,
             signupWithEmail,
             logout,
-            resetPassword
+            resetPassword,
+            updateDisplayName
         }}>
             {children}
         </AuthContext.Provider>

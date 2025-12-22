@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, LogOut, Settings as SettingsIcon, Palette, Check, Monitor, Moon, Sun, BrainCircuit } from 'lucide-react';
+import { Menu, LogOut, Settings as SettingsIcon, Palette, Check, Monitor, Moon, Sun, BrainCircuit, Edit2 } from 'lucide-react';
 import { RouteName, UserProfile, ThemeMode, AccentColor } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useData } from '../contexts/DataContext';
@@ -47,11 +47,14 @@ function useDropdownPosition(anchorRef: React.RefObject<HTMLElement>, open: bool
 const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) => {
   const { theme, setTheme, accent, setAccent } = useTheme();
   const { stats, resetData } = useData();
-  const { logout } = useAuth();
+  const { logout, updateDisplayName } = useAuth();
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showStudySettings, setShowStudySettings] = useState(false);
+  
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
 
   const themeBtnRef = useRef<HTMLButtonElement>(null);
   const profileBtnRef = useRef<HTMLButtonElement>(null);
@@ -92,6 +95,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
         setShowThemeDropdown(false);
         setShowProfileDropdown(false);
         setShowStudySettings(false);
+        setIsEditingName(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -104,6 +108,18 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
       } catch (error) {
           console.error("Logout failed", error);
       }
+  };
+
+  const handleStartEditName = () => {
+      setTempName(user?.name || '');
+      setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+      if(tempName.trim()) {
+          await updateDisplayName(tempName);
+      }
+      setIsEditingName(false);
   };
 
   const ThemeDropdownPortal = showThemeDropdown
@@ -181,7 +197,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
   const ProfileDropdownPortal = showProfileDropdown
     ? createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setShowProfileDropdown(false)} />
+          <div className="fixed inset-0 z-[9998]" onClick={() => { setShowProfileDropdown(false); setIsEditingName(false); }} />
           <div
             className={[
               'fixed z-[9999] w-64 overflow-hidden',
@@ -195,9 +211,27 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
             role="menu"
           >
             <div className="p-4 border-b border-border-color/70 bg-accent/5">
-              <p className="text-[11px] font-black tracking-widest uppercase text-text-primary truncate">
-                {user?.name || 'Guest'}
-              </p>
+              {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                      <input 
+                        value={tempName} 
+                        onChange={e => setTempName(e.target.value)} 
+                        className="flex-1 bg-white/10 border border-white/20 rounded p-1 text-[11px] font-bold text-text-primary outline-none focus:border-accent"
+                        autoFocus
+                        onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                      />
+                      <button onClick={handleSaveName} className="p-1 rounded hover:bg-white/10 text-accent"><Check size={12}/></button>
+                  </div>
+              ) : (
+                  <div className="flex items-center justify-between group">
+                    <p className="text-[11px] font-black tracking-widest uppercase text-text-primary truncate">
+                        {user?.name || 'Guest'}
+                    </p>
+                    <button onClick={handleStartEditName} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10 text-text-secondary hover:text-text-primary">
+                        <Edit2 size={10} />
+                    </button>
+                  </div>
+              )}
               <p className="text-[8px] uppercase font-bold opacity-30 mt-1 text-text-primary truncate">
                 {user?.email || 'Authorized Candidate'}
               </p>

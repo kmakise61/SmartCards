@@ -53,13 +53,9 @@ export const useData = () => {
 
 // Config Generator
 const getDefaultDashboardConfig = (): DashboardConfig => {
-    const month = new Date().toLocaleString('default', { month: 'long' });
-    const year = new Date().getFullYear();
-    const nextExamYear = TARGET_DATE.getFullYear();
-    
     return {
         title: "Precision Board Review.",
-        subtitle: `Locked in for ${month} ${year} — Ready for ${nextExamYear}.`,
+        subtitle: "LOCK IN!!",
         lastUpdated: Date.now()
     };
 };
