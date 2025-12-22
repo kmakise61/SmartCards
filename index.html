@@ -57,43 +57,44 @@
     </script>
     <style>
       :root {
-        --accent-rgb: 236 72 153;
-        --on-accent-rgb: 255 255 255;
-        --bg-rgb: 248 250 252;
-        --surface-rgb: 255 255 255;
-        --panel-bg: 255 255 255;
-        --text-primary: 15 23 42;
-        --text-secondary: 71 85 105;
+        /* Comma-separated for compatibility with rgba() */
+        --accent-rgb: 236, 72, 153;
+        --on-accent-rgb: 255, 255, 255;
+        --bg-rgb: 248, 250, 252;
+        --surface-rgb: 255, 255, 255;
+        --panel-bg: 255, 255, 255;
+        --text-primary: 15, 23, 42;
+        --text-secondary: 71, 85, 105;
         --border-color: rgba(0, 0, 0, 0.08);
       }
 
       .dark {
-        --bg-rgb: 10 15 28;
-        --surface-rgb: 15 23 42;
-        --panel-bg: 15 23 42;
-        --text-primary: 241 245 249;
-        --text-secondary: 148 163 184;
+        --bg-rgb: 10, 15, 28;
+        --surface-rgb: 15, 23, 42;
+        --panel-bg: 15, 23, 42;
+        --text-primary: 241, 245, 249;
+        --text-secondary: 148, 163, 184;
         --border-color: rgba(255, 255, 255, 0.1);
       }
 
       .midnight {
-        --bg-rgb: 5 5 8; /* Slightly lighter than pure black for depth */
-        --surface-rgb: 14 16 22; /* Richer deep surface */
-        --panel-bg: 14 16 22;
-        --text-primary: 248 250 252; /* Brighter white */
-        --text-secondary: 148 163 184; /* Better contrast grey */
-        --border-color: rgba(255, 255, 255, 0.14); /* Stronger borders */
+        --bg-rgb: 5, 5, 8;
+        --surface-rgb: 14, 16, 22;
+        --panel-bg: 14, 16, 22;
+        --text-primary: 248, 250, 252;
+        --text-secondary: 148, 163, 184;
+        --border-color: rgba(255, 255, 255, 0.14);
       }
 
       .glass-panel {
-        background: rgb(var(--surface-rgb) / 0.75);
+        background-color: rgba(var(--surface-rgb), 0.85); /* Robust fallback */
         backdrop-filter: blur(20px) saturate(180%);
         -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid var(--border-color);
       }
 
       .midnight .glass-panel {
-        background: rgb(var(--surface-rgb) / 0.65);
+        background-color: rgba(var(--surface-rgb), 0.75);
         border: 1px solid rgba(255, 255, 255, 0.12);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
       }
