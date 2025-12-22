@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, BookOpen, Sparkles } from 'lucide-react';
 import { Flashcard as FlashcardType } from '../../types';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface FlashcardProps {
   card: FlashcardType;
@@ -192,6 +193,11 @@ export const FormattedText: React.FC<{
 };
 
 const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped, onFlip }) => {
+  const { isDark } = useTheme();
+  
+  // Use inline style for background as a fail-safe against CSS variable/class issues in production
+  const fallbackBg = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+
   return (
     <div
       className="relative w-full max-w-2xl mx-auto perspective-1000 group cursor-pointer"
@@ -204,8 +210,10 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped, onFlip }) => {
         }`}
       >
         {/* FRONT */}
-        {/* Added bg-white and dark:bg-slate-900 to ensure visibility if glass effect fails */}
-        <div className="absolute inset-0 w-full h-full backface-hidden flex flex-col bg-white dark:bg-slate-900 glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20">
+        <div 
+          className="absolute inset-0 w-full h-full backface-hidden flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20"
+          style={{ backgroundColor: fallbackBg }}
+        >
           <div className="absolute top-0 inset-x-0 h-1 bg-accent" />
           <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center overflow-y-auto custom-scrollbar">
             <div className="mb-8 md:mb-12">
@@ -233,8 +241,10 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped, onFlip }) => {
         </div>
 
         {/* BACK */}
-        {/* Added solid background colors to fix transparency issues */}
-        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 flex flex-col bg-white dark:bg-slate-900 glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20">
+        <div 
+          className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20"
+          style={{ backgroundColor: fallbackBg }}
+        >
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-accent to-purple-600" />
           
           <div className="flex-1 p-8 md:p-12 flex flex-col items-center overflow-y-auto custom-scrollbar">
