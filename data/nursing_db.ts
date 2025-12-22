@@ -20,6 +20,8 @@ import { NP5_SET1 } from './np5_flashcards/np5_set1';
 import { NP5_SET2 } from './np5_flashcards/np5_set2';
 import { NP5_SET3 } from './np5_flashcards/np5_set3';
 import { NP5_SET4 } from './np5_flashcards/np5_set4';
+import { PHARM_LABS_SET1 } from './pharm_labs_flashcards/pharm_labs_set1';
+import { PRIO_DEL_SET1 } from './prio_del_flashcards/prio_del_set1';
 
 // Exporting the High Yield NP Sets as the default seeded cards
 // Safe spreading: If an import is undefined due to path errors, it won't crash the app.
@@ -44,5 +46,7 @@ export const SEEDED_CARDS: Flashcard[] = [
     ...(NP5_SET1 || []),
     ...(NP5_SET2 || []),
     ...(NP5_SET3 || []),
-    ...(NP5_SET4 || [])
+    ...(NP5_SET4 || []),
+    ...(PHARM_LABS_SET1 || []),
+    ...(PRIO_DEL_SET1 || [])
 ];

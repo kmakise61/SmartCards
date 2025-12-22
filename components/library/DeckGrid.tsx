@@ -28,6 +28,8 @@ const DeckGrid: React.FC<DeckGridProps> = ({ onSelectDeck, onCreateDeck, onEditD
     { id: 'NP3', title: 'NP 3: Medical-Surgical I', desc: 'Perioperative Care, Oxygenation, Metabolism, and Endocrine.' },
     { id: 'NP4', title: 'NP 4: Medical-Surgical II', desc: 'Perception, Coordination, Acute Care, and Emergency Nursing.' },
     { id: 'NP5', title: 'NP 5: Psych & Leadership', desc: 'Mental Health, Psychiatric Nursing, Management, and Leadership.' },
+    { id: 'PHARM', title: 'Pharmacology & Labs', desc: 'Critical lab values, drug classifications, suffixes, and therapeutic ranges.' },
+    { id: 'PRIO', title: 'Priority & Delegation', desc: 'Clinical prioritization rules, delegation guidelines, and management concepts.' },
   ];
 
   const customDecks = useMemo(() => decks.filter(d => d.tags.includes('Custom')), [decks]);
@@ -234,7 +236,7 @@ const DeckGrid: React.FC<DeckGridProps> = ({ onSelectDeck, onCreateDeck, onEditD
                 <div className="relative z-10">
                   <div className="flex justify-between items-start mb-6">
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-accent/20 ${deck.color || (isCustom ? 'bg-blue-500' : 'bg-accent')}`}>
-                      {activeFolder?.[0] === 'N' ? activeFolder : 'C'}
+                      {activeFolder?.[0] === 'N' ? activeFolder : activeFolder?.[0]}
                     </div>
                     <div className="relative">
                       <button onClick={(e) => handleOpenMenu(e, deck.id)} className={`p-2 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10 dark:hover:bg-white/10 ${isDark ? 'text-white' : 'text-slate-600'}`}>

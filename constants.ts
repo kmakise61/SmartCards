@@ -222,6 +222,22 @@ export const INITIAL_DECKS: Deck[] = [
     cardCount: 50,
     tags: ['NP5', 'Emergency', 'Trauma'],
     color: 'bg-red-700'
+  },
+  {
+    id: 'pharm_labs_set1',
+    title: 'Pharm & Lab Values',
+    description: 'Essential pharmacology, drug suffixes, antidotes, and critical laboratory values.',
+    cardCount: 50,
+    tags: ['PHARM', 'Labs', 'Pharmacology'],
+    color: 'bg-amber-500'
+  },
+  {
+    id: 'prio_del_set1',
+    title: 'Prioritization & Delegation',
+    description: 'Rules for priority, scope of practice, and clinical judgment scenarios.',
+    cardCount: 50,
+    tags: ['PRIO', 'Prioritization', 'Management'],
+    color: 'bg-red-600'
   }
 ];
 

@@ -2,15 +2,13 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { 
     collection, 
     doc, 
-    getDocs, 
     setDoc, 
     addDoc, 
     updateDoc, 
     deleteDoc, 
     writeBatch, 
     onSnapshot,
-    Timestamp,
-    query
+    Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Deck, Flashcard, StudyStats, Quiz, CardRating, ReviewLog, StudyPreferences, DashboardConfig } from '../types';
@@ -39,7 +37,7 @@ interface DataContextType {
   deleteDeck: (deckId: string) => void;
   copyDeck: (deckId: string) => void;
   logReview: (cardId: string, rating: CardRating) => void;
-  seedDatabase: () => Promise<void>; 
+  seedDatabase: (specificCards?: Flashcard[], forceDecks?: boolean) => Promise<void>; 
   isSeeding: boolean;
 }
 
@@ -66,6 +64,50 @@ const getDefaultDashboardConfig = (): DashboardConfig => {
     };
 };
 
+// --- SEEDING HELPERS ---
+
+// 1. Recursive cleaner to find and log undefined fields (Defensive)
+const logUndefinedFields = (obj: any, path: string, docId: string) => {
+    if (obj === null || typeof obj !== 'object') return;
+    Object.entries(obj).forEach(([key, value]) => {
+        if (value === undefined) {
+            console.warn(`[Seed Warning] Card ${docId}: Field '${path}${key}' is undefined. Auto-fixing by removal.`);
+        } else if (typeof value === 'object') {
+            logUndefinedFields(value, `${path}${key}.`, docId);
+        }
+    });
+};
+
+// 2. Strict Enrichment: Sets defaults for optional fields to avoid undefined
+const enrichCardForSeed = (card: Flashcard): Flashcard => {
+    return {
+        ...card,
+        // Force critical optional fields to be strings/arrays, never undefined
+        hint: card.hint ?? "", 
+        tags: card.tags ?? [],
+        // Scheduling defaults
+        status: card.status || 'new',
+        interval: card.interval || 0,
+        easeFactor: card.easeFactor || 2.5,
+        nextReview: card.nextReview || new Date().toISOString(),
+        fsrs: card.fsrs || {
+            stability: 0.5,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            retrievability: 1
+        }
+    };
+};
+
+// 3. Final Sanitizer: Strips any remaining undefined values
+const sanitizeForFirestore = (card: Flashcard): any => {
+    // Check for undefineds before stripping them (for logging requirement)
+    logUndefinedFields(card, '', card.id);
+    // JSON stringify removes undefined keys, making it Firestore-safe
+    return JSON.parse(JSON.stringify(card));
+};
+
 export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ children, uid }) => {
   const analytics = useGamification(uid);
 
@@ -75,49 +117,79 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
   const [stats, setStats] = useState<StudyStats>(INITIAL_STATS);
   const [preferences, setPreferences] = useState<StudyPreferences>(DEFAULT_PREFERENCES);
   const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig>(getDefaultDashboardConfig());
+  
   const [isSeeding, setIsSeeding] = useState(false);
-  const [hasAttemptedAutoSeed, setHasAttemptedAutoSeed] = useState(false);
+  
+  // Loading states
+  const [decksLoaded, setDecksLoaded] = useState(false);
+  const [cardsLoaded, setCardsLoaded] = useState(false);
 
   // --- ACTIONS ---
 
-  const seedDatabase = async () => {
+  const seedDatabase = async (specificCards: Flashcard[] = [], forceDecks = false) => {
       if (isSeeding) return;
       setIsSeeding(true);
-      console.log("Starting Auto-Seeding...");
+      
+      const cardsToProcess = specificCards.length > 0 ? specificCards : SEEDED_CARDS;
+      const isFullSeed = specificCards.length === 0;
+
+      console.log(`[Seed] Starting process for user ${uid}. Mode: ${isFullSeed ? 'Full Initialization' : 'Partial Repair'}. Cards to add: ${cardsToProcess.length}. Decks update: ${forceDecks}`);
+      
       try {
           const batch = writeBatch(db);
-          
-          // 1. Seed Decks
-          INITIAL_DECKS.forEach(deck => {
-              const ref = doc(db, `users/${uid}/decks/${deck.id}`);
-              batch.set(ref, deck);
-          });
+          let operationCount = 0;
+          const MAX_BATCH_SIZE = 450; 
 
-          // 2. Seed Preferences
-          const prefRef = doc(db, `users/${uid}/settings/preferences`);
-          batch.set(prefRef, DEFAULT_PREFERENCES);
-          
-          // 3. Seed Dashboard Config
-          const dashRef = doc(db, `users/${uid}/settings/dashboard`);
-          batch.set(dashRef, getDefaultDashboardConfig());
-
-          await batch.commit();
-
-          // 4. Seed Cards (Chunked)
-          const CHUNK_SIZE = 300; 
-          for (let i = 0; i < SEEDED_CARDS.length; i += CHUNK_SIZE) {
-              const chunk = SEEDED_CARDS.slice(i, i + CHUNK_SIZE);
-              const cardBatch = writeBatch(db);
-              chunk.forEach(card => {
-                  const ref = doc(db, `users/${uid}/cards/${card.id}`);
-                  cardBatch.set(ref, card);
+          // 1. Seed Decks & Settings
+          // We write decks if it's a full seed OR if we explicitly forced it (missing decks detected)
+          if (isFullSeed || forceDecks) {
+              INITIAL_DECKS.forEach(deck => {
+                  const ref = doc(db, `users/${uid}/decks/${deck.id}`);
+                  batch.set(ref, deck, { merge: true }); // Merge allows updating existing decks without wiping custom fields if any
+                  operationCount++;
               });
-              await cardBatch.commit();
-              console.log(`Seeded chunk ${i / CHUNK_SIZE + 1}`);
+
+              if (isFullSeed) {
+                  const prefRef = doc(db, `users/${uid}/settings/preferences`);
+                  batch.set(prefRef, DEFAULT_PREFERENCES, { merge: true });
+                  
+                  const dashRef = doc(db, `users/${uid}/settings/dashboard`);
+                  batch.set(dashRef, getDefaultDashboardConfig(), { merge: true });
+                  operationCount += 2;
+              }
           }
-          console.log("Seeding complete successfully.");
+
+          // Commit initial batch if it has ops
+          if (operationCount > 0) {
+              await batch.commit();
+              console.log("[Seed] Decks & Settings committed.");
+          }
+
+          // 2. Seed Cards (Chunked & Sanitized)
+          if (cardsToProcess.length > 0) {
+              const CHUNK_SIZE = 200; 
+              for (let i = 0; i < cardsToProcess.length; i += CHUNK_SIZE) {
+                  const chunk = cardsToProcess.slice(i, i + CHUNK_SIZE);
+                  const cardBatch = writeBatch(db);
+                  
+                  chunk.forEach(card => {
+                      // A. Normalize & Enrich (Ensure hint is "")
+                      const enriched = enrichCardForSeed(card);
+                      // B. Sanitize (Strip undefined, log warnings)
+                      const finalPayload = sanitizeForFirestore(enriched);
+                      
+                      const ref = doc(db, `users/${uid}/cards/${finalPayload.id}`);
+                      cardBatch.set(ref, finalPayload);
+                  });
+
+                  await cardBatch.commit();
+                  console.log(`[Seed] Committed chunk ${i / CHUNK_SIZE + 1} / ${Math.ceil(cardsToProcess.length / CHUNK_SIZE)}`);
+              }
+          }
+          
+          console.log("[Seed] Completed successfully.");
       } catch (e) {
-          console.error("Seeding failed", e);
+          console.error("[Seed] Failed:", e);
       } finally {
           setIsSeeding(false);
       }
@@ -132,15 +204,8 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
           const loadedDecks: Deck[] = [];
           snapshot.forEach(doc => loadedDecks.push(doc.data() as Deck));
           setDecks(loadedDecks);
-          
-          // Auto-seed if empty and haven't tried yet
-          if (loadedDecks.length === 0 && !hasAttemptedAutoSeed && !isSeeding && snapshot.metadata.hasPendingWrites === false) {
-              setHasAttemptedAutoSeed(true);
-              seedDatabase();
-          }
-      }, (error) => {
-          console.error("Error fetching decks:", error);
-      });
+          setDecksLoaded(true);
+      }, (error) => console.error("Error decks:", error));
       return () => unsub();
   }, [uid]);
 
@@ -151,9 +216,8 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
           const loadedCards: Flashcard[] = [];
           snapshot.forEach(doc => loadedCards.push(doc.data() as Flashcard));
           setCards(loadedCards);
-      }, (error) => {
-          console.error("Error fetching cards:", error);
-      });
+          setCardsLoaded(true);
+      }, (error) => console.error("Error cards:", error));
       return () => unsub();
   }, [uid]);
 
@@ -164,16 +228,56 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
 
       const unsubPrefs = onSnapshot(prefsRef, (doc) => {
           if (doc.exists()) setPreferences(doc.data() as StudyPreferences);
-      }, (error) => console.error("Error fetching prefs:", error));
-      
+      });
       const unsubDash = onSnapshot(dashRef, (doc) => {
           if (doc.exists()) setDashboardConfig(doc.data() as DashboardConfig);
-      }, (error) => console.error("Error fetching dashboard config:", error));
-
+      });
       return () => { unsubPrefs(); unsubDash(); };
   }, [uid]);
 
-  // 4. Sync Analytics Hook to Stats State
+  // 4. ROBUST AUTO-REPAIR LOGIC
+  useEffect(() => {
+      if (!decksLoaded || !cardsLoaded || isSeeding) return;
+
+      // Identify Missing Cards (Diffing)
+      const existingIds = new Set(cards.map(c => c.id));
+      const missingCards = SEEDED_CARDS.filter(c => !existingIds.has(c.id));
+
+      // Identify Missing Decks (Diffing)
+      const existingDeckIds = new Set(decks.map(d => d.id));
+      const missingDecks = INITIAL_DECKS.filter(d => !existingDeckIds.has(d.id));
+      const hasMissingDecks = missingDecks.length > 0;
+
+      if (missingCards.length > 0 || hasMissingDecks) {
+          console.warn(`[Auto-Repair] Integrity Check Failed. Missing ${missingCards.length} cards and ${missingDecks.length} decks.`);
+          
+          if (decks.length === 0 && cards.length === 0) {
+              // Complete initialization
+              seedDatabase(); 
+          } else {
+              // Partial update (cards and/or decks)
+              seedDatabase(missingCards, hasMissingDecks);
+          }
+      }
+
+  }, [decksLoaded, cardsLoaded, cards.length, decks.length, isSeeding]);
+
+  // 5. DEV CONSOLE SUMMARY
+  useEffect(() => {
+      if (decksLoaded && cardsLoaded) {
+          const dueNow = cards.filter(c => c.status === 'new' || (c.nextReview && new Date(c.nextReview) <= new Date())).length;
+          console.group("PNLE SmartCards Data Integrity");
+          console.log(`User ID          : ${uid}`);
+          console.log(`Source Definition: ${SEEDED_CARDS.length} cards`);
+          console.log(`Firestore Count  : ${cards.length} cards`);
+          console.log(`Missing Count    : ${SEEDED_CARDS.length > cards.length ? SEEDED_CARDS.length - cards.length : 0}`);
+          console.log(`Decks Available  : ${decks.length}`);
+          console.log(`Ready for Study  : ${dueNow}`);
+          console.groupEnd();
+      }
+  }, [decksLoaded, cardsLoaded]);
+
+  // 6. Sync Analytics
   useEffect(() => {
       setStats(prev => ({
           ...prev,
@@ -216,21 +320,25 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
       };
 
       const deckCards = cards.filter(c => c.deckId === deckId);
-      
       const batch = writeBatch(db);
       batch.set(doc(db, `users/${uid}/decks/${newDeckId}`), newDeck);
       
       deckCards.forEach(card => {
           const newCardId = `card_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          const newCard = { ...card, id: newCardId, deckId: newDeckId, status: 'new' as const, interval: 0 };
-          batch.set(doc(db, `users/${uid}/cards/${newCardId}`), newCard);
+          // Use sanitizer here too
+          const enriched = enrichCardForSeed({ ...card, id: newCardId, deckId: newDeckId });
+          const payload = sanitizeForFirestore(enriched);
+          batch.set(doc(db, `users/${uid}/cards/${newCardId}`), payload);
       });
       
       await batch.commit();
   };
 
   const addCard = async (card: Flashcard) => {
-      await setDoc(doc(db, `users/${uid}/cards/${card.id}`), card);
+      const enriched = enrichCardForSeed(card);
+      const payload = sanitizeForFirestore(enriched);
+      await setDoc(doc(db, `users/${uid}/cards/${card.id}`), payload);
+      
       const deck = decks.find(d => d.id === card.deckId);
       if (deck) {
           updateDeck(deck.id, { cardCount: (deck.cardCount || 0) + 1 });
@@ -238,7 +346,9 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
   };
 
   const updateCard = async (cardId: string, updates: Partial<Flashcard>) => {
-      await updateDoc(doc(db, `users/${uid}/cards/${cardId}`), updates);
+      // Sanitize updates as well
+      const cleanUpdates = JSON.parse(JSON.stringify(updates));
+      await updateDoc(doc(db, `users/${uid}/cards/${cardId}`), cleanUpdates);
   };
 
   const deleteCard = async (cardId: string) => {
@@ -308,7 +418,9 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
           leitnerBox: nextSchedule.leitnerBox
       };
 
-      await updateDoc(doc(db, `users/${uid}/cards/${cardId}`), cardUpdates);
+      // Sanitize updates
+      const cleanUpdates = JSON.parse(JSON.stringify(cardUpdates));
+      await updateDoc(doc(db, `users/${uid}/cards/${cardId}`), cleanUpdates);
   };
 
   const resetData = async () => {
