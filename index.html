@@ -26,9 +26,9 @@
             theme: {
                 extend: {
                     colors: {
-                        background: 'var(--bg-rgb)',
-                        surface: 'var(--surface-rgb)',
-                        panel: 'var(--panel-bg)',
+                        background: 'rgb(var(--bg-rgb))',
+                        surface: 'rgb(var(--surface-rgb))',
+                        panel: 'rgb(var(--panel-bg))',
                         'text-primary': 'rgb(var(--text-primary))',
                         'text-secondary': 'rgb(var(--text-secondary))',
                         'border-color': 'var(--border-color)',
@@ -86,14 +86,14 @@
       }
 
       .glass-panel {
-        background: rgba(var(--surface-rgb), 0.75);
+        background: rgb(var(--surface-rgb) / 0.75);
         backdrop-filter: blur(20px) saturate(180%);
         -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid var(--border-color);
       }
 
       .midnight .glass-panel {
-        background: rgba(var(--surface-rgb), 0.65);
+        background: rgb(var(--surface-rgb) / 0.65);
         border: 1px solid rgba(255, 255, 255, 0.12);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
       }
@@ -243,12 +243,10 @@
         transform: rotateY(180deg);
       }
     </style>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
     <div id="modal-root"></div>
     <script type="module" src="./index.tsx"></script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
