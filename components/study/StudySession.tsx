@@ -84,12 +84,6 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
         
         // D3. Select Cards
         // Priority: Due > New
-        // Note: If a specific deck is selected, users often expect to study it regardless of global limits.
-        // However, we apply limits to prevent overwhelm, but we ensure at least *some* cards are shown if available.
-        
-        // If limits are 0 but cards exist in a specifically selected deck, allow a small override batch (optional UX choice),
-        // but here we strictly follow limits unless it results in 0 cards for a specific deck session.
-        
         let selectedDue = candidatesDue.sort((a,b) => (a.nextReview && b.nextReview) ? a.nextReview.localeCompare(b.nextReview) : 0).slice(0, limitReview);
         let selectedNew = candidatesNew.slice(0, limitNew);
 
@@ -303,9 +297,9 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
         </div>
       </div>
 
-      {/* Card Area */}
-      <div className="flex-1 flex flex-col items-center justify-start md:justify-center p-4 gap-6 overflow-y-auto custom-scrollbar z-10 pb-20">
-         <div className="w-full">
+      {/* Card Area - Adjusted for Flex grow and better centering on mobile */}
+      <div className="flex-1 flex flex-col items-center justify-start md:justify-center p-4 gap-6 overflow-y-auto custom-scrollbar z-10 pb-32 md:pb-20">
+         <div className="w-full h-full flex flex-col justify-center">
              <Flashcard 
                 card={currentCard} 
                 isFlipped={isFlipped} 
@@ -313,8 +307,8 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
              />
          </div>
 
-         {/* Controls */}
-         <div className="w-full flex justify-center pb-4">
+         {/* Controls - Fixed height wrapper to prevent jumping */}
+         <div className="w-full flex justify-center flex-none min-h-[100px]">
              <StudyControls 
                 onRate={handleRate} 
                 disabled={!isFlipped}
