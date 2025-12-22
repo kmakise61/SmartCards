@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     X, Save, BrainCircuit, Layers, 
-    Zap, Target, Info, Calculator, Clock
+    Zap, Target, Info, Calculator, Clock, HelpCircle
 } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -96,30 +96,49 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
         const now = new Date().toISOString();
         const today = now.split('T')[0];
 
-        const availableReviewCount = cards.filter(c => c.status !== 'new' && c.nextReview && c.nextReview <= now).length;
-        const availableNewCount = cards.filter(c => c.status === 'new').length;
+        // 1. Total available in the "pool"
+        // Reviews Due: Not New + Scheduled before or equal to now.
+        const totalReviewsDue = cards.filter(c => c.status !== 'new' && c.nextReview && c.nextReview <= now).length;
+        // New Available: All cards with status 'new'
+        const totalNewAvailable = cards.filter(c => c.status === 'new').length;
 
+        // 2. Daily Limits Progress
         const progressDate = stats.dailyProgress?.date === today ? stats.dailyProgress : { newStudied: 0, reviewStudied: 0 };
         const doneNew = progressDate.newStudied || 0;
         const doneReview = progressDate.reviewStudied || 0;
 
+        // 3. Remaining Allowances
         const limitNew = Math.max(0, localPrefs.newCardsPerDay);
         const limitReview = Math.max(0, localPrefs.reviewCardsPerDay);
 
         const remainingNewAllowance = Math.max(0, limitNew - doneNew);
         const remainingReviewAllowance = Math.max(0, limitReview - doneReview);
 
-        const projectedNew = Math.min(availableNewCount, remainingNewAllowance);
-        const projectedReview = Math.min(availableReviewCount, remainingReviewAllowance);
-        const totalProjected = projectedNew + projectedReview;
+        // 4. Cards Allowed Today (Intersection of Availability vs Limit)
+        const allowedNew = Math.min(totalNewAvailable, remainingNewAllowance);
+        const allowedReview = Math.min(totalReviewsDue, remainingReviewAllowance);
+        const totalAllowedToday = allowedNew + allowedReview;
 
+        // 5. Ignite Batch Logic (Per Session)
         const sessionSize = localPrefs.sessionSize;
-        const igniteReviews = Math.min(projectedReview, sessionSize);
-        const igniteNew = Math.min(projectedNew, Math.max(0, sessionSize - igniteReviews));
+        
+        // Priority goes to Reviews first in study session generator. 
+        // We cap the reviews by session size, then fill remaining space with new cards.
+        const igniteReviews = Math.min(allowedReview, sessionSize);
+        const igniteNew = Math.min(allowedNew, Math.max(0, sessionSize - igniteReviews));
         const igniteTotal = igniteReviews + igniteNew;
 
         return {
-            availableReviewCount, availableNewCount, remainingNewAllowance, remainingReviewAllowance, totalProjected, igniteTotal, igniteReviews, igniteNew
+            totalReviewsDue,
+            totalNewAvailable,
+            remainingNewAllowance,
+            remainingReviewAllowance,
+            allowedNew,
+            allowedReview,
+            totalAllowedToday,
+            igniteTotal,
+            igniteReviews,
+            igniteNew
         };
     }, [cards, stats, localPrefs]);
 
@@ -170,31 +189,55 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 relative z-10">
-                            <div className="flex flex-col">
-                                <span className={`text-[10px] font-bold uppercase opacity-60 ${t.highlightText}`}>Total Due</span>
+                            {/* Total Due */}
+                            <div className="flex flex-col group relative">
+                                <div className="flex items-center gap-1">
+                                    <span className={`text-[10px] font-bold uppercase opacity-60 ${t.highlightText}`}>Total Due</span>
+                                    <HelpCircle size={10} className={`${t.highlightText} opacity-40`} />
+                                </div>
                                 <span className={`text-xl font-black ${t.textPrimary}`}>
-                                    {projection.availableReviewCount + projection.availableNewCount}
+                                    {projection.totalReviewsDue + projection.totalNewAvailable}
                                 </span>
-                                <span className={`text-[9px] opacity-50 ${t.textPrimary}`}>Reviews + New</span>
+                                <span className={`text-[9px] opacity-60 ${t.textPrimary}`}>
+                                    {projection.totalReviewsDue} Rev + {projection.totalNewAvailable} New
+                                </span>
+                                {/* Simple Tooltip via title attribute for now */}
+                                <div className="absolute top-0 left-0 w-full h-full cursor-help" title="Total cards available in your decks that are either Due for review or are New (never studied)." />
                             </div>
-                            <div className="flex flex-col">
-                                <span className={`text-[10px] font-bold uppercase opacity-60 ${t.highlightText}`}>Allowed</span>
+
+                            {/* Cards Allowed Today */}
+                            <div className="flex flex-col group relative">
+                                <div className="flex items-center gap-1">
+                                    <span className={`text-[10px] font-bold uppercase opacity-60 ${t.highlightText}`}>Allowed Today</span>
+                                    <HelpCircle size={10} className={`${t.highlightText} opacity-40`} />
+                                </div>
                                 <span className={`text-xl font-black ${t.textPrimary}`}>
-                                    {projection.totalProjected}
+                                    {projection.totalAllowedToday}
                                 </span>
-                                <span className={`text-[9px] opacity-50 ${t.textPrimary}`}>Based on Limits</span>
+                                <span className={`text-[9px] opacity-60 ${t.textPrimary}`}>
+                                    Limit: {localPrefs.reviewCardsPerDay} Rev / {localPrefs.newCardsPerDay} New
+                                </span>
+                                <div className="absolute top-0 left-0 w-full h-full cursor-help" title="The actual number of cards you can study today based on your daily limits. If limits are reached, this number stops growing." />
                             </div>
-                            <div className={`flex flex-col pl-4 border-l ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
-                                <span className="text-[10px] font-bold uppercase opacity-60 text-accent">Ignite Session</span>
+
+                            {/* Ignite Batch */}
+                            <div className={`flex flex-col pl-4 border-l ${isDark ? 'border-blue-500/20' : 'border-blue-200'} group relative`}>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-bold uppercase opacity-60 text-accent">Ignite Batch</span>
+                                    <HelpCircle size={10} className="text-accent opacity-40" />
+                                </div>
                                 <span className="text-xl font-black text-accent">
                                     {projection.igniteTotal}
                                 </span>
-                                <span className={`text-[9px] opacity-50 ${t.textPrimary}`}>Will load now</span>
+                                <span className={`text-[9px] opacity-60 ${t.textPrimary}`}>
+                                    Loads: {projection.igniteReviews} Rev + {projection.igniteNew} New
+                                </span>
+                                <div className="absolute top-0 left-0 w-full h-full cursor-help" title="The exact batch that will load when you click 'Ignite Session'. It respects your daily limits and batch size preference." />
                             </div>
                         </div>
                     </div>
 
-                    {/* 2. DAILY LIMITS */}
+                    {/* 2. DAILY WORKLOAD LIMITS */}
                     <div className={`p-5 rounded-2xl ${t.cardBg} ${t.cardBorder}`}>
                         <div className="flex items-center gap-2 mb-6">
                             <Layers size={16} className="text-accent" />
@@ -218,7 +261,7 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                                     className={inputStyle}
                                 />
                                 <p className={`text-[10px] leading-relaxed ${t.textSecondary}`}>
-                                    Max <strong>never-seen-before</strong> cards to introduce today. Set to 0 to only do reviews.
+                                    Applies to <strong>never-seen cards</strong> only. Increasing this rapidly increases future review workload.
                                 </p>
                             </div>
 
@@ -238,7 +281,7 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                                     className={inputStyle}
                                 />
                                 <p className={`text-[10px] leading-relaxed ${t.textSecondary}`}>
-                                    Max <strong>due cards</strong> (previously learned) to show today. Overdue cards are prioritized.
+                                    Caps daily due cards. <strong>Overdue cards are prioritized</strong> first if the limit is too low.
                                 </p>
                             </div>
                         </div>
@@ -253,7 +296,7 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                         
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                                <span className={`text-xs font-bold ${t.textSecondary}`}>Batch Size</span>
+                                <span className={`text-xs font-bold ${t.textSecondary}`}>Batch Size (Per Session Cap)</span>
                                 <span className="text-sm font-black text-accent">{localPrefs.sessionSize} Cards</span>
                             </div>
                             <input 
@@ -268,8 +311,8 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                                 <div className="space-y-1">
                                     <p className={`text-[10px] font-bold ${t.textPrimary}`}>How Ignite Works:</p>
                                     <p className={`text-[10px] leading-relaxed ${t.textSecondary}`}>
-                                        Ignite loads <strong>{localPrefs.sessionSize} cards</strong> at a time. 
-                                        Based on limits, next session: <span className="text-accent font-bold">{projection.igniteReviews} Reviews</span> + <span className="text-accent font-bold">{projection.igniteNew} New</span>.
+                                        Ignite loads a maximum of <strong>{localPrefs.sessionSize} cards</strong> per session. 
+                                        Based on your daily limits, the next session will contain: <span className="text-accent font-bold">{projection.igniteReviews} Reviews</span> + <span className="text-accent font-bold">{projection.igniteNew} New</span>.
                                     </p>
                                 </div>
                             </div>
@@ -296,14 +339,15 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-accent"
                                 />
                                 <p className={`text-[10px] mt-2 ${t.textSecondary}`}>
-                                    <strong>90%</strong> is recommended for Board Exam prep. Lowering this reduces daily workload but increases forgetting.
+                                    <strong>85% - 92%</strong> is recommended for PNLE prep. 
+                                    <br/>Note: Higher retention = significantly more frequent reviews.
                                 </p>
                             </div>
 
                             <div className={`flex items-center justify-between pt-4 border-t border-dashed ${t.divider}`}>
                                 <div>
-                                    <label className={`block text-xs font-bold ${t.textPrimary}`}>FSRS Fuzzing</label>
-                                    <p className={`text-[10px] ${t.textSecondary}`}>Slightly varies due dates to prevent bunching.</p>
+                                    <label className={`block text-xs font-bold ${t.textPrimary}`}>FSRS Fuzzing (Prevents Due-Date Bunching)</label>
+                                    <p className={`text-[10px] ${t.textSecondary}`}>Adds small random offsets to intervals so cards don't all pile up on the same day.</p>
                                 </div>
                                 <button 
                                     onClick={() => setLocalPrefs(p => ({ ...p, enableFuzz: !p.enableFuzz }))}
@@ -319,7 +363,7 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                     <div className={`p-5 rounded-2xl border bg-accent/5 border-accent/20`}>
                         <div className="flex items-center gap-2 mb-4">
                             <Clock size={16} className="text-accent" />
-                            <h3 className={`text-xs font-black uppercase tracking-widest ${t.textPrimary}`}>PNLE Optimization</h3>
+                            <h3 className={`text-xs font-black uppercase tracking-widest ${t.textPrimary}`}>PNLE – August 2026 Optimization</h3>
                         </div>
 
                         <div className="space-y-6">
@@ -348,7 +392,7 @@ const StudySettingsModal: React.FC<StudySettingsModalProps> = ({ isOpen, onClose
                                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-accent"
                                 />
                                 <p className={`text-[10px] mt-2 ${t.textSecondary}`}>
-                                    Higher intensity compresses review intervals slightly to ensure peak retention before Nov 2025.
+                                    Applies a <strong>{(1 - localPrefs.examCountdownIntensity / 100 * 0.2).toFixed(2)}x - 1.0x</strong> multiplier to intervals as the exam approaches to ensure peak retention.
                                 </p>
                             </div>
                         </div>
