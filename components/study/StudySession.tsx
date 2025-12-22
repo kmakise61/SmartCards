@@ -87,12 +87,6 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
         let selectedDue = candidatesDue.sort((a,b) => (a.nextReview && b.nextReview) ? a.nextReview.localeCompare(b.nextReview) : 0).slice(0, limitReview);
         let selectedNew = candidatesNew.slice(0, limitNew);
 
-        // Fallback: If Specific Deck selected and limits prevent showing cards, but cards are available, show them.
-        if (deckId && selectedDue.length === 0 && selectedNew.length === 0) {
-             if (candidatesDue.length > 0) selectedDue = candidatesDue.slice(0, 20); // Override limit
-             else if (candidatesNew.length > 0) selectedNew = candidatesNew.slice(0, 20);
-        }
-
         let finalBatch = [...selectedDue, ...selectedNew];
 
         // D4. High Yield Sort (Optional)

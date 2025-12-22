@@ -101,7 +101,7 @@ const normalizeStoredTextToMd = (raw: string) => {
 
 // --- SUB-COMPONENTS ---
 
-const ToolBtn = ({ title, onClick, children }: { title: string, onClick: () => void, children: React.ReactNode }) => (
+const ToolBtn = ({ title, onClick, children }: { title: string, onClick: () => void, children?: React.ReactNode }) => (
   <button
     type="button"
     title={title}

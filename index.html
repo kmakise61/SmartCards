@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PNLE SmartCards</title>
     <script type="importmap">
 {
@@ -87,7 +87,8 @@
       }
 
       .glass-panel {
-        background-color: rgba(var(--surface-rgb), 0.85); /* Robust fallback */
+        /* Standard syntax using commas is safer for Vercel/PostCSS */
+        background-color: rgba(var(--surface-rgb), 0.85); 
         backdrop-filter: blur(20px) saturate(180%);
         -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid var(--border-color);
@@ -244,10 +245,12 @@
         transform: rotateY(180deg);
       }
     </style>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
     <div id="modal-root"></div>
     <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
