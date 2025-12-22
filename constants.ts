@@ -8,8 +8,8 @@ import {
 import { NavigationItem, StudyStats, UserProfile, Flashcard, Deck, Quiz, StudyPreferences } from "./types";
 
 export const APP_NAME = "PNLE SmartCards";
-// PNLE usually happens in May/Nov.
-export const TARGET_DATE = new Date("2025-11-20"); 
+// PNLE usually happens in May/Nov, targeting August 2026 as per user request.
+export const TARGET_DATE = new Date("2026-08-20"); 
 
 export const NAV_ITEMS: NavigationItem[] = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
