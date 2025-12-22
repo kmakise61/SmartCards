@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNLE SmartCards</title>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+  }
+}
+</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: 'var(--bg-rgb)',
+                        surface: 'var(--surface-rgb)',
+                        panel: 'var(--panel-bg)',
+                        'text-primary': 'rgb(var(--text-primary))',
+                        'text-secondary': 'rgb(var(--text-secondary))',
+                        'border-color': 'var(--border-color)',
+                        accent: 'rgb(var(--accent-rgb))',
+                        'on-accent': 'rgb(var(--on-accent-rgb))',
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+      :root {
+        --accent-rgb: 236 72 153;
+        --on-accent-rgb: 255 255 255;
+        --bg-rgb: 248 250 252;
+        --surface-rgb: 255 255 255;
+        --panel-bg: 255 255 255;
+        --text-primary: 15 23 42;
+        --text-secondary: 71 85 105;
+        --border-color: rgba(0, 0, 0, 0.08);
+      }
+
+      .dark {
+        --bg-rgb: 10 15 28;
+        --surface-rgb: 15 23 42;
+        --panel-bg: 15 23 42;
+        --text-primary: 241 245 249;
+        --text-secondary: 148 163 184;
+        --border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .midnight {
+        --bg-rgb: 5 5 8; /* Slightly lighter than pure black for depth */
+        --surface-rgb: 14 16 22; /* Richer deep surface */
+        --panel-bg: 14 16 22;
+        --text-primary: 248 250 252; /* Brighter white */
+        --text-secondary: 148 163 184; /* Better contrast grey */
+        --border-color: rgba(255, 255, 255, 0.14); /* Stronger borders */
+      }
+
+      .glass-panel {
+        background: rgba(var(--surface-rgb), 0.75);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid var(--border-color);
+      }
+
+      .midnight .glass-panel {
+        background: rgba(var(--surface-rgb), 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .sharp-card {
+        border-radius: 0;
+        border: 1px solid var(--border-color);
+      }
+
+      /* keep your existing special highlight class */
+      .mark-highlight {
+        background: rgba(var(--accent-rgb), 0.15);
+        color: rgb(var(--accent-rgb));
+        padding: 0 2px;
+        font-weight: 700;
+        border-radius: 2px;
+      }
+
+      /* MARK highlight (global renderer) */
+      mark {
+        background: rgba(var(--accent-rgb), 0.22);
+        color: rgb(var(--text-primary));
+        padding: 0 3px;
+        border-radius: 4px;
+        font-weight: 800;
+      }
+      .dark mark,
+      .midnight mark {
+        background: rgba(var(--accent-rgb), 0.28);
+        color: rgb(var(--text-primary));
+      }
+
+      /* prose defaults */
+      .prose {
+        color: rgb(var(--text-primary));
+      }
+      .prose strong {
+        color: rgb(var(--accent-rgb));
+        font-weight: 900;
+      }
+      .prose u {
+        text-decoration-color: rgb(var(--accent-rgb));
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+      }
+      .prose blockquote {
+        border-left: 3px solid rgba(var(--accent-rgb), 0.45);
+        padding: 0.8rem 1rem;
+        border-radius: 16px;
+        background: rgba(var(--surface-rgb), 0.35);
+      }
+      .dark .prose blockquote,
+      .midnight .prose blockquote {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .prose ul {
+        padding-left: 1.25rem;
+        margin: 0.5rem 0;
+      }
+      .prose li {
+        margin: 0.15rem 0;
+      }
+
+      /* ✅ Rich text editor styling (scoped to .rte) */
+      .rte {
+        color: inherit;
+        caret-color: currentColor;
+      }
+
+      /* Prevent execCommand from making text invisible */
+      .rte * {
+        color: inherit !important;
+        caret-color: currentColor;
+      }
+
+      /* Make formatting pretty inside the editor too */
+      .rte strong,
+      .rte b {
+        color: rgb(var(--accent-rgb)) !important;
+        font-weight: 900;
+      }
+
+      .rte u {
+        text-decoration-color: rgb(var(--accent-rgb));
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+      }
+
+      .rte mark {
+        background: rgba(var(--accent-rgb), 0.22);
+        padding: 0 3px;
+        border-radius: 4px;
+        font-weight: 800;
+      }
+
+      .rte blockquote {
+        border-left: 3px solid rgba(var(--accent-rgb), 0.45);
+        padding: 0.6rem 0.9rem;
+        border-radius: 14px;
+        margin: 0.4rem 0;
+        background: rgba(var(--surface-rgb), 0.35);
+      }
+      .dark .rte blockquote,
+      .midnight .rte blockquote {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .rte ul {
+        padding-left: 1.25rem;
+        margin: 0.4rem 0;
+      }
+      .rte li {
+        margin: 0.15rem 0;
+      }
+
+      /* modal overlay utility */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        left: 0;
+        top: 0;
+      }
+
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(var(--accent-rgb), 0.3);
+      }
+
+      .perspective-1000 {
+        perspective: 1000px;
+      }
+      .transform-style-3d {
+        transform-style: preserve-3d;
+      }
+      .backface-hidden {
+        backface-visibility: hidden;
+      }
+      .rotate-y-180 {
+        transform: rotateY(180deg);
+      }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+    <div id="modal-root"></div>
+    <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
