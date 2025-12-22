@@ -106,9 +106,9 @@ export const FormattedText: React.FC<{
       : size === 'lg'
       ? 'text-lg'
       : size === 'xl'
-      ? 'text-xl md:text-2xl'
+      ? 'text-lg md:text-xl lg:text-2xl' // Adjusted for better mobile fit
       : size === '2xl'
-      ? 'text-2xl md:text-4xl'
+      ? 'text-xl md:text-2xl lg:text-3xl' // Adjusted for better mobile fit
       : 'text-base';
 
   const textAlign = align === 'center' ? 'text-center' : 'text-left';
@@ -126,7 +126,7 @@ export const FormattedText: React.FC<{
             <li 
               key={idx} 
               className="flex gap-3 items-start text-left"
-              style={{ paddingLeft: `${item.indent * 1.5}rem` }}
+              style={{ paddingLeft: `${item.indent * 1}rem` }}
             >
               <span className="text-accent mt-[0.5em] text-[8px] shrink-0 opacity-80">●</span>
               <span className="flex-1 leading-relaxed break-words min-w-0">
@@ -196,13 +196,12 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped, onFlip }) => {
   const { isDark } = useTheme();
   
   // Use inline style for background as a fail-safe against CSS variable/class issues in production
-  const fallbackBg = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+  const fallbackBg = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
 
   return (
     <div
-      className="relative w-full max-w-2xl mx-auto perspective-1000 group cursor-pointer"
+      className="relative w-full max-w-2xl mx-auto perspective-1000 group cursor-pointer h-[55dvh] md:h-[65dvh]"
       onClick={onFlip}
-      style={{ minHeight: '60vh' }}
     >
       <div
         className={`relative w-full h-full transition-all duration-500 transform-style-3d ${
@@ -211,71 +210,84 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped, onFlip }) => {
       >
         {/* FRONT */}
         <div 
-          className="absolute inset-0 w-full h-full backface-hidden flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20"
+          className="absolute inset-0 w-full h-full backface-hidden flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20 overflow-hidden"
           style={{ backgroundColor: fallbackBg }}
         >
-          <div className="absolute top-0 inset-x-0 h-1 bg-accent" />
-          <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center overflow-y-auto custom-scrollbar">
-            <div className="mb-8 md:mb-12">
-              <span className="px-4 py-1.5 border border-accent/20 text-accent text-[10px] font-black uppercase tracking-[0.25em] rounded-full bg-accent/5 shadow-sm">
-                Inquiry
-              </span>
-            </div>
-            <div className="font-bold leading-relaxed tracking-tight w-full flex-1 flex flex-col justify-center">
-              <FormattedText text={card.front} align="center" size="2xl" />
-            </div>
-            {card.hint && (
-              <div className="mt-8 md:mt-12 group/hint relative inline-block">
-                <div className="px-5 py-2.5 border border-border-color transition-all duration-300 blur-sm hover:blur-none select-none text-xs bg-panel text-text-secondary rounded-lg">
-                  {card.hint}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-accent z-10" />
+          
+          <div className="flex-1 w-full flex flex-col relative overflow-hidden">
+             {/* Header Section */}
+             <div className="flex-none pt-8 px-6 flex justify-center z-10">
+                <span className="px-4 py-1.5 border border-accent/20 text-accent text-[10px] font-black uppercase tracking-[0.25em] rounded-full bg-accent/5 shadow-sm">
+                  Inquiry
+                </span>
+             </div>
+
+             {/* Content Scrollable Area */}
+             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 flex flex-col justify-center items-center w-full">
+                <div className="w-full">
+                   <FormattedText text={card.front} align="center" size="2xl" />
                 </div>
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-accent opacity-50 group-hover/hint:opacity-0 transition-opacity">
-                  <Eye size={8} /> Clue
-                </div>
-              </div>
-            )}
+                {card.hint && (
+                  <div className="mt-8 md:mt-12 group/hint relative inline-block text-center w-full">
+                    <div className="inline-block px-5 py-2.5 border border-border-color transition-all duration-300 blur-sm hover:blur-none select-none text-xs bg-panel text-text-secondary rounded-lg max-w-full break-words">
+                      {card.hint}
+                    </div>
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-accent opacity-50 group-hover/hint:opacity-0 transition-opacity whitespace-nowrap">
+                      <Eye size={8} /> Clue
+                    </div>
+                  </div>
+                )}
+             </div>
           </div>
-          <div className="p-5 border-t border-border-color text-center text-[9px] font-black uppercase tracking-[0.3em] opacity-40 text-text-secondary">
+
+          {/* Footer Fixed at Bottom */}
+          <div className="flex-none p-5 border-t border-border-color text-center text-[9px] font-black uppercase tracking-[0.3em] opacity-40 text-text-secondary z-10 bg-inherit">
             Tap to Reveal
           </div>
         </div>
 
         {/* BACK */}
         <div 
-          className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20"
+          className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 flex flex-col glass-panel sharp-card shadow-2xl rounded-[2rem] border border-white/20 overflow-hidden"
           style={{ backgroundColor: fallbackBg }}
         >
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-accent to-purple-600" />
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-accent to-purple-600 z-10" />
           
-          <div className="flex-1 p-8 md:p-12 flex flex-col items-center overflow-y-auto custom-scrollbar">
-            <div className="mb-8 w-full flex justify-center">
-               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
-                  <BookOpen size={12} className="text-accent" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">
-                    Rationale
-                  </span>
-               </div>
-            </div>
-            
-            <div className="w-full flex-1 flex flex-col justify-center">
-              <FormattedText text={card.back} align="left" size="xl" />
-            </div>
+          <div className="flex-1 w-full flex flex-col relative overflow-hidden">
+             {/* Header */}
+             <div className="flex-none pt-8 px-6 flex justify-center z-10">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+                    <BookOpen size={12} className="text-accent" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">
+                      Rationale
+                    </span>
+                </div>
+             </div>
 
-            {card.tags.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-border-color w-full flex flex-wrap gap-2 justify-center">
-                {card.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1.5 rounded-lg border border-border-color bg-panel text-[9px] font-black text-text-secondary uppercase tracking-widest"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
+             {/* Content Scrollable */}
+             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 flex flex-col justify-center items-center w-full">
+                <div className="w-full">
+                  <FormattedText text={card.back} align="left" size="xl" />
+                </div>
+
+                {card.tags.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-border-color w-full flex flex-wrap gap-2 justify-center">
+                    {card.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-3 py-1.5 rounded-lg border border-border-color bg-panel text-[9px] font-black text-text-secondary uppercase tracking-widest"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+             </div>
           </div>
           
-          <div className="p-5 border-t border-border-color text-center text-[9px] font-black uppercase tracking-[0.3em] opacity-40 text-text-secondary">
+          {/* Footer */}
+          <div className="flex-none p-5 border-t border-border-color text-center text-[9px] font-black uppercase tracking-[0.3em] opacity-40 text-text-secondary z-10 bg-inherit">
             <Sparkles size={10} className="inline mr-1" /> Peer Verified
           </div>
         </div>
