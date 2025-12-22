@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Maximize2, Minimize2, Zap, Target, Layers } from 'lucide-react';
+import { X, Maximize2, Minimize2, Zap, Target, Layers, ArrowRight } from 'lucide-react';
 import Flashcard from './Flashcard';
 import StudyControls from './StudyControls';
 import StudySummary from './StudySummary';
@@ -31,6 +31,9 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   // UI State
   const [isFlipped, setIsFlipped] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  
+  // New: Allow user to bypass limits from the "Empty" screen
+  const [ignoreLimits, setIgnoreLimits] = useState(false);
 
   // Focus Mode Effect
   useEffect(() => {
@@ -38,9 +41,12 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
     return () => toggleFocusMode(false);
   }, [isFocusMode, toggleFocusMode]);
 
-  // --- 1. QUEUE GENERATION (Run Once) ---
+  // --- 1. QUEUE GENERATION (Run Once or when ignoreLimits changes) ---
   useEffect(() => {
-    if (status !== 'initializing') return;
+    // Only rebuild queue if we are initializing OR if we just turned on ignoreLimits
+    if (status !== 'initializing' && !ignoreLimits) return;
+    // If we are already active and ignoreLimits didn't just change, don't rebuild
+    if (status === 'active' && queue.length > 0) return;
 
     const buildQueue = () => {
         // A. Drill Mode (Direct pass-through)
@@ -79,12 +85,21 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
             : { newStudied: 0, reviewStudied: 0 };
 
         // Ensure we don't have negative limits
-        const limitNew = Math.max(0, preferences.newCardsPerDay - dailyProgress.newStudied);
-        const limitReview = Math.max(0, preferences.reviewCardsPerDay - dailyProgress.reviewStudied);
+        // IF ignoreLimits is true, we override the daily remaining allowance with the session size
+        const limitNew = ignoreLimits 
+            ? preferences.sessionSize 
+            : Math.max(0, preferences.newCardsPerDay - dailyProgress.newStudied);
+            
+        const limitReview = ignoreLimits 
+            ? preferences.sessionSize 
+            : Math.max(0, preferences.reviewCardsPerDay - dailyProgress.reviewStudied);
         
         // D3. Select Cards
         // Priority: Due > New
+        // Sort Due cards by date (oldest due first)
         let selectedDue = candidatesDue.sort((a,b) => (a.nextReview && b.nextReview) ? a.nextReview.localeCompare(b.nextReview) : 0).slice(0, limitReview);
+        
+        // If we filled the session with reviews, great. If not, add new cards.
         let selectedNew = candidatesNew.slice(0, limitNew);
 
         let finalBatch = [...selectedDue, ...selectedNew];
@@ -100,6 +115,7 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
         }
 
         // D5. Session Batch Size
+        // We ensure we don't exceed session size, but if ignoreLimits is on, we ensure we actually fill the session if cards exist
         const batchSize = preferences.sessionSize || 25;
         if (finalBatch.length > batchSize) {
             finalBatch = finalBatch.slice(0, batchSize);
@@ -110,14 +126,14 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
 
     const newQueue = buildQueue();
 
-    if (newQueue.length > 0) {
+    if (newQueue && newQueue.length > 0) {
         setQueue(newQueue);
         setStatus('active');
     } else {
         setStatus('empty');
     }
 
-  }, [cards, deckId, mode, drillCards, preferences, stats, status]);
+  }, [cards, deckId, mode, drillCards, preferences, stats, status, ignoreLimits]);
 
 
   // --- 2. INTERACTION HANDLERS ---
@@ -190,6 +206,11 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  const handleContinueAnyway = () => {
+      setIgnoreLimits(true);
+      setStatus('initializing');
+  };
+
 
   // --- 5. RENDER STATES ---
 
@@ -212,22 +233,54 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   }
 
   if (status === 'empty') {
+      const isDailyLimitReached = mode === 'standard' && !ignoreLimits;
+
       return (
         <div className="flex h-full items-center justify-center flex-col gap-6 text-center p-6 animate-in fade-in zoom-in-95">
             <div className={`p-6 rounded-full ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
-                <Layers size={48} className="text-accent opacity-50" />
+                {isDailyLimitReached ? (
+                    <Target size={48} className="text-emerald-500 opacity-80" />
+                ) : (
+                    <Layers size={48} className="text-accent opacity-50" />
+                )}
             </div>
-            <div>
-                <h2 className={`text-2xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>All Caught Up!</h2>
-                <p className={`max-w-md opacity-60 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {mode === 'standard' 
-                        ? "You've reached your daily limit or have no cards due right now." 
-                        : "No cards found for this specific deck or filter."}
+            
+            <div className="max-w-md">
+                <h2 className={`text-2xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {isDailyLimitReached ? "Daily Goal Met!" : "All Caught Up!"}
+                </h2>
+                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {isDailyLimitReached 
+                        ? `You have studied your ${preferences.newCardsPerDay} new cards for the day. Great work!`
+                        : "There are no more cards matching your criteria right now."}
                 </p>
             </div>
-            <button onClick={onExit} className="px-8 py-3 bg-accent rounded-xl text-white text-sm font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all">
-                Return to Dashboard
-            </button>
+
+            <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
+                <button 
+                    onClick={onExit} 
+                    className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all ${
+                        isDark 
+                            ? 'bg-white text-slate-900 hover:bg-slate-200' 
+                            : 'bg-slate-900 text-white hover:bg-slate-700'
+                    }`}
+                >
+                    Return to Dashboard
+                </button>
+                
+                {isDailyLimitReached && (
+                    <button 
+                        onClick={handleContinueAnyway}
+                        className={`w-full py-3.5 rounded-xl border font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                            isDark 
+                                ? 'border-white/10 text-white hover:bg-white/5' 
+                                : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Zap size={16} /> Extend Session
+                    </button>
+                )}
+            </div>
         </div>
       );
   }
@@ -239,7 +292,7 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   const getModeLabel = () => {
       if (mode === 'drill') return 'Weakness Drill';
       if (mode === 'quick-fire') return 'Quick Fire';
-      return 'Daily Review';
+      return ignoreLimits ? 'Extended Session' : 'Daily Review';
   };
 
   return (
@@ -262,6 +315,7 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
                     </span>
                     {mode === 'quick-fire' && <Zap size={12} className="text-accent fill-accent" />}
                     {mode === 'drill' && <Target size={12} className="text-red-500 fill-red-500" />}
+                    {ignoreLimits && <Zap size={12} className="text-yellow-500 fill-yellow-500" />}
                  </div>
                  <div className="flex items-center gap-2">
                     <span className={`font-bold ${isDark || isFocusMode ? 'text-white' : 'text-slate-900'}`}>
