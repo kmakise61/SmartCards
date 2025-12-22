@@ -1,16 +1,113 @@
-export type Theme = 'light' | 'dark' | 'crescere';
+import { LucideIcon } from "lucide-react";
 
-export interface UserSettings {
+export type ThemeMode = 'light' | 'dark' | 'midnight';
+
+export type AccentColor = 'rose' | 'blue' | 'gold' | 'emerald' | 'violet';
+
+export type RouteName = 
+  | 'Dashboard' 
+  | 'My Decks' 
+  | 'Quizzes' 
+  | 'Analytics';
+
+export interface NavigationItem {
+  name: RouteName;
+  icon: LucideIcon;
+  path: string;
+}
+
+export interface UserProfile {
   name: string;
-  email?: string; // Added for Profile Dropdown
-  avatar?: string; // Added for Profile Dropdown
-  rank?: string; // Added for Gamification Badge
-  theme: Theme;
-  learningStyle: 'visual' | 'auditory' | 'read-write' | 'kinesthetic';
-  cardsPerDay: number;
-  accessibility: {
-    fontScale: number; // 1 = 100%
-    reduceMotion: boolean;
+  avatarUrl: string;
+  title: string;
+  email: string;
+}
+
+export interface DailyActivity {
+  date: string; // ISO Date String (YYYY-MM-DD)
+  count: number;
+}
+
+export interface StudyStats {
+  cardsDue: number;
+  retentionRate: number;
+  streakDays: number;
+  cardsLearned: number;
+  totalStudyTimemins: number;
+  lastStudyDate: string | null; // ISO Date string
+  activityHistory: DailyActivity[]; 
+  // Tracking for daily limits
+  dailyProgress?: {
+    date: string;
+    newStudied: number;
+    reviewStudied: number;
+  };
+}
+
+export type CardRating = 'again' | 'hard' | 'good' | 'easy';
+
+export interface ReviewLog {
+  timestamp: number;
+  rating: CardRating;
+}
+
+export type SchedulingEngine = 'smartcards' | 'sm2' | 'fsrs' | 'leitner';
+
+export interface StudyPreferences {
+  schedulingEngine: SchedulingEngine;
+  
+  // Session Limits
+  questionsPerDay: number; // Global cap (legacy support)
+  newCardsPerDay: number;
+  reviewCardsPerDay: number;
+  sessionSize: number;
+
+  // FSRS Specifics
+  targetRetention: number; // 0.75 - 0.95
+  enableFuzz: boolean;
+
+  // PNLE Specifics
+  highYieldMode: boolean; // Prioritize high-yield tags
+  examCountdownIntensity: number; // 0-100 slider (Interval scaling)
+
+  // Legacy/Other Engines
+  easyBonusDays: number; 
+}
+
+export interface DashboardConfig {
+  title: string;
+  subtitle: string;
+  lastUpdated: number;
+}
+
+export interface Flashcard {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  hint?: string;
+  tags: string[];
+  lastReviewed?: string; // ISO Date string
+  nextReview?: string; // ISO Date string
+  interval: number; // Days (float)
+  easeFactor: number;
+  status: 'new' | 'learning' | 'review' | 'relearning';
+  
+  // Enhanced Features
+  isFavorite?: boolean;
+  reviewHistory?: ReviewLog[]; // Compact history
+  struggleScore?: number; // Computed score (0-100)
+
+  // Scheduling Metadata
+  learningStepIndex?: number;
+  previousIntervalDays?: number; // For relearning
+  leitnerBox?: number; // 1-5
+  fsrs?: {
+    stability: number;
+    difficulty: number;
+    elapsedDays: number;
+    scheduledDays: number;
+    retrievability: number;
   };
 }
 
@@ -18,48 +115,25 @@ export interface Deck {
   id: string;
   title: string;
   description: string;
-  category: 'Fundamentals' | 'Med-Surg' | 'OB' | 'Pedia' | 'Psych' | 'Community' | 'Weak Areas' | 'Custom';
   cardCount: number;
-  masteryLevel: number; // 0-100
-  color: string;
-}
-
-export interface Card {
-  id: string;
-  deckId: string;
-  front: string;
-  back: string;
-  type: 'standard' | 'vignette' | 'input';
-  image?: string;
-  notes?: string; // Clinical pearl
   tags: string[];
-  
-  // SM-2 Data
-  interval: number; // days
-  repetitions: number;
-  easeFactor: number;
-  dueDate: string; // ISO Date string
-  state: 'new' | 'learning' | 'review' | 'relearning';
+  color: string; // Tailwind class
+  lastStudied?: string; // ISO Date string
 }
 
-export interface ReviewLog {
+// --- NEW QUIZ TYPES ---
+export interface QuizQuestion {
   id: string;
-  cardId: string;
-  rating: 1 | 2 | 3 | 4; // 1: Again, 2: Hard, 3: Good, 4: Easy
-  reviewedAt: string;
-  timeSpent: number; // seconds
-}
-
-export interface Question {
-  id: string;
-  category: string;
-  difficulty: 'easy' | 'medium' | 'hard';
   text: string;
   options: string[];
-  correctIndices: number[]; // Array for SATA support
-  rationale: string;
-  type: 'mcq' | 'sata';
+  correctOptionIndex: number;
+  explanation: string;
 }
 
-// Navigation types
-export type Page = 'dashboard' | 'today' | 'decks' | 'create-card' | 'test' | 'analytics' | 'settings';
+export interface Quiz {
+  id: string;
+  title: string;
+  description: string;
+  questions: QuizQuestion[];
+  bestScore?: number;
+}

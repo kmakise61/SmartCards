@@ -1,225 +1,343 @@
-import React, { useState } from 'react';
-import { Menu, Moon, Sun, User as UserIcon, LogOut, Settings, ChevronDown, Crown, Sparkles } from 'lucide-react';
-import { UserSettings, Theme } from '../types';
-import { useTheme } from '../context/ThemeContext';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Menu, LogOut, Settings as SettingsIcon, Palette, Check, Monitor, Moon, Sun, BrainCircuit } from 'lucide-react';
+import { RouteName, UserProfile, ThemeMode, AccentColor } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
+import StudySettingsModal from './StudySettingsModal';
 
 interface TopBarProps {
-  title: string;
-  onMenuClick: () => void;
-  user: UserSettings;
-  onToggleTheme: (theme: Theme) => void;
-  onLogout: () => void;
+  currentRoute: RouteName;
+  openMobileMenu: () => void;
+  user?: UserProfile;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ title, onMenuClick, user, onToggleTheme, onLogout }) => {
-  const { themeMode, fontSize } = useTheme();
-  
-  const [showDropdown, setShowDropdown] = useState(false);
-  
-  // Format Date manually to avoid date-fns dependency if not desired, or add importmap if strictly needed.
-  // Using native Intl for zero-dependency solution matching format 'Tuesday, Aug 29th'
-  const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: 'numeric' };
-  const today = new Date().toLocaleDateString('en-US', dateOptions);
+type DropdownPos = { top: number; right: number };
 
-  const isCrescere = themeMode === 'crescere';
-  const isDark = themeMode === 'dark';
+function useDropdownPosition(anchorRef: React.RefObject<HTMLElement>, open: boolean) {
+  const [pos, setPos] = useState<DropdownPos>({ top: 0, right: 0 });
 
-  const handleThemeCycle = () => {
-    const next: Theme = themeMode === 'light' ? 'dark' : themeMode === 'dark' ? 'crescere' : 'light';
-    onToggleTheme(next);
+  useEffect(() => {
+    if (!open) return;
+
+    const compute = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const gap = 10;
+      const top = rect.bottom + gap;
+      const right = Math.max(10, window.innerWidth - rect.right);
+      setPos({ top, right });
+    };
+
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+    };
+  }, [anchorRef, open]);
+
+  return pos;
+}
+
+const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) => {
+  const { theme, setTheme, accent, setAccent } = useTheme();
+  const { stats, resetData } = useData();
+  const { logout } = useAuth();
+
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [showStudySettings, setShowStudySettings] = useState(false);
+
+  const themeBtnRef = useRef<HTMLButtonElement>(null);
+  const profileBtnRef = useRef<HTMLButtonElement>(null);
+
+  const themePos = useDropdownPosition(themeBtnRef, showThemeDropdown);
+  const profilePos = useDropdownPosition(profileBtnRef, showProfileDropdown);
+
+  const accents: { id: AccentColor; label: string; color: string }[] = useMemo(
+    () => [
+      { id: 'rose', label: 'Rose', color: 'bg-pink-500' },
+      { id: 'blue', label: 'Blue', color: 'bg-blue-500' },
+      { id: 'gold', label: 'Gold', color: 'bg-amber-500' },
+      { id: 'emerald', label: 'Emerald', color: 'bg-emerald-500' },
+      { id: 'violet', label: 'Violet', color: 'bg-violet-500' },
+    ],
+    []
+  );
+
+  const activeAccentLabel = accents.find(a => a.id === accent)?.label || 'Rose';
+
+  const getAccentLabelStyle = () => {
+    if (accent === 'rose') return 'text-pink-600 dark:text-pink-400';
+    return 'text-accent';
   };
 
-  const getThemeIcon = () => {
-      switch(themeMode) {
-          case 'light': return <Moon size={18} />;
-          case 'dark': return <Crown size={18} />;
-          case 'crescere': return <Sun size={18} />;
+  const modes: { id: ThemeMode; label: string; icon: any }[] = useMemo(
+    () => [
+      { id: 'light', label: 'Light', icon: Sun },
+      { id: 'dark', label: 'Dark', icon: Moon },
+      { id: 'midnight', label: 'Deep', icon: Monitor },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowThemeDropdown(false);
+        setShowProfileDropdown(false);
+        setShowStudySettings(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const handleLogout = async () => {
+      try {
+          await logout();
+      } catch (error) {
+          console.error("Logout failed", error);
       }
   };
 
-  // --- DYNAMIC FONT SCALING (VISUALLY BALANCED) ---
-  const getGlobalTextSize = () => {
-      switch(fontSize) {
-          case 'small': return 'text-[9px]'; 
-          case 'large': return 'text-xs'; 
-          case 'extra-large': return 'text-[13px]'; 
-          default: return 'text-[11px]'; // Normal
-      }
-  };
+  const ThemeDropdownPortal = showThemeDropdown
+    ? createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowThemeDropdown(false)} />
+          <div
+            className={[
+              'fixed z-[9999] w-72 p-5',
+              'glass-panel',
+              'border border-border-color/70',
+              'rounded-2xl',
+              'shadow-[0_24px_90px_-45px_rgba(0,0,0,0.75)]',
+              'animate-in fade-in slide-in-from-top-1',
+            ].join(' ')}
+            style={{ top: themePos.top, right: themePos.right }}
+            role="menu"
+          >
+            <div className="space-y-6">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-3 text-text-primary">
+                  Workspace Mode
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {modes.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setTheme(m.id)}
+                      className={[
+                        'rounded-2xl p-3 border-2 transition-all',
+                        'flex flex-col items-center justify-center gap-2',
+                        theme === m.id
+                          ? 'border-accent bg-accent/10 text-text-primary'
+                          : 'border-transparent bg-white/5 hover:bg-white/10 text-text-secondary',
+                      ].join(' ')}
+                    >
+                      <m.icon size={16} />
+                      <span className="text-[8px] font-black uppercase tracking-widest">
+                        {m.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-  const getSlashSize = () => {
-      switch(fontSize) {
-          case 'small': return 'text-xs';
-          case 'large': return 'text-base';
-          case 'extra-large': return 'text-lg';
-          default: return 'text-sm';
-      }
-  }
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-40 text-text-primary">
+                    Accent Color
+                    </p>
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${getAccentLabelStyle()}`}>
+                        {activeAccentLabel}
+                    </span>
+                </div>
+                <div className="flex justify-between p-1 rounded-2xl bg-black/10 border border-white/5">
+                  {accents.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setAccent(a.id)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform hover:scale-105 ${a.color}`}
+                      aria-label={`Set accent ${a.id}`}
+                    >
+                      {accent === a.id && <Check size={14} className="text-white" strokeWidth={4} />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
+      )
+    : null;
 
-  // Dropdown internal scaling
-  const getDropdownTextSize = (type: 'name' | 'meta' | 'item') => {
-      switch (fontSize) {
-          case 'small':
-              if (type === 'name') return 'text-xs';
-              if (type === 'meta') return 'text-[9px]';
-              return 'text-[10px]';
-          case 'large':
-              if (type === 'name') return 'text-sm';
-              if (type === 'meta') return 'text-[11px]';
-              return 'text-xs';
-          case 'extra-large':
-              if (type === 'name') return 'text-base';
-              if (type === 'meta') return 'text-xs';
-              return 'text-sm';
-          default: // Normal
-              if (type === 'name') return 'text-[13px]';
-              if (type === 'meta') return 'text-[10px]';
-              return 'text-[11px]';
-      }
-  };
-
-  // --- GLASSMORPHISM HEADER ---
-  const topBarClass = isCrescere
-    ? 'bg-white/40 border-b border-white/50 shadow-[0_4px_30px_rgba(244,63,94,0.05)]'
-    : isDark
-      ? 'bg-[#0B1121]/60 border-b border-white/5 shadow-xl shadow-black/5' 
-      : 'bg-white/60 border-b border-slate-200/60 shadow-sm'; 
-
-  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-slate-500';
-  const buttonHover = isDark ? 'hover:bg-white/10 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900';
+  const ProfileDropdownPortal = showProfileDropdown
+    ? createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowProfileDropdown(false)} />
+          <div
+            className={[
+              'fixed z-[9999] w-56 overflow-hidden',
+              'glass-panel',
+              'border border-border-color/70',
+              'rounded-2xl',
+              'shadow-[0_24px_90px_-45px_rgba(0,0,0,0.75)]',
+              'animate-in fade-in slide-in-from-top-1',
+            ].join(' ')}
+            style={{ top: profilePos.top, right: profilePos.right }}
+            role="menu"
+          >
+            <div className="p-4 border-b border-border-color/70 bg-accent/5">
+              <p className="text-[11px] font-black tracking-widest uppercase text-text-primary truncate">
+                {user?.name || 'Guest'}
+              </p>
+              <p className="text-[8px] uppercase font-bold opacity-30 mt-1 text-text-primary truncate">
+                {user?.email || 'Authorized Candidate'}
+              </p>
+            </div>
+            <div className="p-1 space-y-1">
+              <button onClick={() => setShowStudySettings(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors text-text-secondary hover:bg-white/5">
+                <SettingsIcon size={14} /> Preferences
+              </button>
+              <button
+                onClick={resetData}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors text-red-500 hover:bg-red-500/10"
+              >
+                <Monitor size={14} /> Wipe Data
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors text-text-primary hover:bg-white/5 border-t border-white/5 mt-1"
+              >
+                <LogOut size={14} /> Sign Out
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body
+      )
+    : null;
 
   return (
     <>
-      <header className={`sticky top-0 z-40 w-full h-16 px-4 md:px-8 flex items-center justify-between backdrop-blur-2xl transition-all duration-500 ${topBarClass}`}>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={onMenuClick}
-            className={`lg:hidden p-2 -ml-2 rounded-xl transition-all active:scale-95 ${textSecondary} ${buttonHover}`}
+      <header
+        className={[
+          'w-full h-14 md:h-16 px-4 md:px-6 flex items-center justify-between',
+          'glass-panel',
+          'border-x-0 border-t-0 border-b border-border-color/70',
+          'shadow-[0_18px_60px_-35px_rgba(0,0,0,0.6)]',
+          'relative z-[200]',
+        ].join(' ')}
+      >
+        <div className="flex items-center gap-3 md:gap-4">
+          <button
+            onClick={openMobileMenu}
+            className={[
+              'lg:hidden',
+              'w-10 h-10 rounded-2xl',
+              'border border-border-color/70',
+              'glass-panel',
+              'flex items-center justify-center',
+              'text-text-secondary hover:text-text-primary',
+              'hover:border-accent/40 hover:bg-accent/10',
+              'transition-all',
+            ].join(' ')}
+            aria-label="Open menu"
           >
-            <Menu size={20} />
+            <Menu size={18} />
           </button>
-          
-          <div className="hidden sm:block">
-             <div className="flex items-center gap-3 font-black uppercase tracking-[0.2em]">
-                <span className={`${textSecondary} opacity-70 ${getGlobalTextSize()}`}>SmartCards</span>
-                {/* Slash scales relatively */}
-                <span className={`opacity-20 text-slate-500 font-light ${getSlashSize()}`}>/</span>
-                <span className={`tracking-widest flex items-center gap-2 ${textPrimary} ${getGlobalTextSize()}`}>
-                    {title} 
-                    {isCrescere && <Sparkles size={12} className="text-amber-400 animate-pulse" />}
-                </span>
-             </div>
-          </div>
+
+          <h2 className="text-xs md:text-sm font-black uppercase tracking-[0.25em] text-text-primary">
+            {currentRoute}
+          </h2>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className={`hidden lg:block font-black uppercase tracking-[0.3em] text-right opacity-60 ${textSecondary} ${getGlobalTextSize()}`}>
-             <p>{today}</p>
-          </div>
+        <div className="flex items-center gap-2 md:gap-3">
+          {stats.cardsDue > 0 && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-2xl border text-[9px] font-black uppercase tracking-widest bg-accent/5 border-accent/20 text-accent">
+              <div className="w-1 h-1 rounded-full bg-accent animate-pulse" />
+              {stats.cardsDue} Due
+            </div>
+          )}
 
-          <div className="h-6 w-px bg-slate-200/50 dark:bg-white/10 mx-1 hidden sm:block"></div>
+          <div className="h-4 w-px bg-border-color/80 mx-1 hidden sm:block" />
 
+          {/* New Study Settings Button */}
           <button 
-            onClick={handleThemeCycle} 
-            className={`p-2 rounded-xl transition-all active:scale-90 ${textSecondary} ${buttonHover} border border-transparent hover:border-black/5 dark:hover:border-white/10`}
-            title="Switch Theme"
+            onClick={() => setShowStudySettings(true)}
+            className="w-10 h-10 rounded-2xl border border-border-color/70 glass-panel flex items-center justify-center text-text-secondary hover:text-accent hover:border-accent/30 hover:bg-accent/10 transition-all"
+            title="Study Settings"
           >
-            {getThemeIcon()}
+            <BrainCircuit size={18} />
           </button>
 
-          <div className="relative">
-            <button 
-                onClick={() => setShowDropdown(!showDropdown)} 
-                className={`flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-full transition-all border border-transparent hover:bg-slate-100/50 dark:hover:bg-white/5 ${showDropdown ? 'bg-slate-100/50 dark:bg-white/5 ring-2 ring-pink-500/20' : ''}`}
-            >
-              <div className={`w-8 h-8 rounded-full overflow-hidden border shadow-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-white ring-1 ring-slate-100'}`}>
-                {user.avatar ? <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center ${textSecondary}`}><UserIcon size={14} /></div>}
-              </div>
-              <ChevronDown size={12} className={`${textSecondary} hidden sm:block transition-transform duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {showDropdown && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                <div 
-                    className={`
-                        absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden transform origin-top-right animate-in fade-in zoom-in-95 duration-200
-                        w-[clamp(240px,80vw,260px)] mr-1
-                        ${isCrescere 
-                            ? 'bg-white/95 backdrop-blur-3xl border-white/60 shadow-[0_20px_60px_-15px_rgba(244,63,94,0.15)]' 
-                            : isDark 
-                                ? 'bg-[#0f172a]/95 backdrop-blur-3xl border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]' 
-                                : 'bg-white/95 backdrop-blur-3xl border-slate-200/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]'
-                        }
-                    `}
-                >
-                  {/* Header Profile Section */}
-                  <div className={`p-4 border-b ${isCrescere ? 'border-rose-100/50' : isDark ? 'border-white/5' : 'border-slate-100'}`}>
-                    <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full p-0.5 border shrink-0 ${isCrescere ? 'border-rose-200 bg-rose-50' : isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-slate-50'}`}>
-                            <div className="w-full h-full rounded-full overflow-hidden relative bg-slate-200 dark:bg-slate-700">
-                                {user.avatar ? (
-                                    <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className={`w-full h-full flex items-center justify-center ${isCrescere ? 'text-rose-300' : 'text-slate-400'}`}>
-                                        <UserIcon size={14} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h4 className={`font-black truncate ${getDropdownTextSize('name')} ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                {user.name}
-                            </h4>
-                            <p className={`truncate font-medium ${getDropdownTextSize('meta')} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {user.email || 'student@pnle.com'}
-                            </p>
-                        </div>
-                    </div>
-                  </div>
-                  
-                  {/* Menu Options */}
-                  <div className="p-1.5 space-y-0.5">
-                      <button 
-                        onClick={() => { setShowDropdown(false); /* Navigate to settings route via parent would be ideal, but simple toggle here */ }} 
-                        className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all group relative overflow-hidden ${
-                            isDark 
-                            ? 'text-slate-300 hover:text-white hover:bg-white/5' 
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
-                      >
-                          <div className={`p-1.5 rounded-lg transition-colors ${isDark ? 'bg-white/5 group-hover:bg-white/10' : 'bg-slate-100 group-hover:bg-slate-200'}`}>
-                              <Settings size={14} />
-                          </div>
-                          <div className="flex-1 text-left">
-                              <span className={`font-bold block ${getDropdownTextSize('item')}`}>Account Settings</span>
-                          </div>
-                      </button>
+          {/* Visual Settings */}
+          <button
+            ref={themeBtnRef}
+            onClick={() => {
+              setShowThemeDropdown((v) => !v);
+              setShowProfileDropdown(false);
+            }}
+            className={[
+              'w-10 h-10 rounded-2xl',
+              'border border-border-color/70',
+              'glass-panel',
+              'flex items-center justify-center',
+              showThemeDropdown
+                ? 'text-accent border-accent/40 bg-accent/10'
+                : 'text-text-secondary hover:text-text-primary hover:border-accent/30 hover:bg-accent/10',
+              'transition-all',
+            ].join(' ')}
+            aria-expanded={showThemeDropdown}
+            aria-haspopup="menu"
+            aria-label="Theme settings"
+          >
+            <Palette size={18} />
+          </button>
 
-                      <div className={`h-px mx-2 my-1 ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}></div>
-
-                      <button 
-                        onClick={onLogout} 
-                        className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all group text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20`}
-                      >
-                          <div className="p-1.5 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 transition-colors">
-                              <LogOut size={14} />
-                          </div>
-                          <span className={`flex-1 text-left uppercase tracking-wider font-bold ${getDropdownTextSize('item')}`}>Sign Out</span>
-                      </button>
-                  </div>
-                  
-                  {/* Footer Decoration */}
-                  {isCrescere && (
-                      <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-amber-400 to-rose-400"></div>
-                  )}
+          {/* Profile */}
+          <button
+            ref={profileBtnRef}
+            onClick={() => {
+              setShowProfileDropdown((v) => !v);
+              setShowThemeDropdown(false);
+            }}
+            className={[
+              'flex items-center gap-2',
+              'h-10 pl-1 pr-2 rounded-2xl',
+              'border border-border-color/70',
+              'glass-panel',
+              'hover:border-accent/30 hover:bg-white/5',
+              'transition-all',
+            ].join(' ')}
+            aria-expanded={showProfileDropdown}
+            aria-haspopup="menu"
+            aria-label="Profile menu"
+          >
+            {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-2xl object-cover shadow-sm" />
+            ) : (
+                <div className="w-8 h-8 rounded-2xl bg-accent text-white text-[10px] font-black flex items-center justify-center shadow-lg shadow-accent/20">
+                {user?.name?.charAt(0) || 'U'}
                 </div>
-              </>
             )}
-          </div>
+            <span className="hidden md:block text-[10px] font-black uppercase tracking-widest text-text-secondary max-w-[80px] truncate">
+              {user?.name?.split(' ')[0]}
+            </span>
+          </button>
         </div>
       </header>
+
+      {ThemeDropdownPortal}
+      {ProfileDropdownPortal}
+      <StudySettingsModal isOpen={showStudySettings} onClose={() => setShowStudySettings(false)} />
     </>
   );
 };

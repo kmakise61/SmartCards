@@ -1,223 +1,207 @@
-import React from 'react';
-import {
-  LayoutDashboard,
-  Layers,
-  PlusCircle,
-  BrainCircuit,
-  BarChart2,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  GraduationCap,
-  X,
-} from 'lucide-react';
-import { Page } from '../types';
-import { useTheme } from '../context/ThemeContext';
+// SIDEBAR.tsx — refined (removed the distracting divider under "SmartCards")
+// Focus: premium glass, NO hard separator line between brand and nav
+
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, GraduationCap, X } from 'lucide-react';
+import { NAV_ITEMS } from '../constants';
+import { RouteName } from '../types';
 
 interface SidebarProps {
-  activePage: Page;
-  onNavigate: (page: Page) => void;
-  isOpen: boolean;
-  onClose: () => void;
-  isMinimized?: boolean;
-  onToggleMinimize?: () => void;
+  currentRoute: RouteName;
+  onNavigate: (route: RouteName) => void;
+  isMinimized: boolean;
+  toggleMinimize: () => void;
+  isMobileOpen: boolean;
+  closeMobileMenu: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  activePage,
+  currentRoute,
   onNavigate,
-  isOpen,
-  onClose,
-  isMinimized = false,
-  onToggleMinimize,
+  isMinimized,
+  toggleMinimize,
+  isMobileOpen,
+  closeMobileMenu,
 }) => {
-  const { themeMode, reduceMotion, fontSize } = useTheme();
+  const [isTabletOrBelow, setIsTabletOrBelow] = useState(false);
 
-  // SmartCards Specific Navigation - Removed Settings
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'today', label: 'Today Queue', icon: <BrainCircuit size={20} />, special: true }, // Highlighted
-    { id: 'decks', label: 'My Decks', icon: <Layers size={20} /> },
-    { id: 'create-card', label: 'Create Card', icon: <PlusCircle size={20} /> },
-    { id: 'test', label: 'Test Mode', icon: <BookOpen size={20} /> },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart2 size={20} /> },
-  ];
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const apply = () => setIsTabletOrBelow(mq.matches);
+    apply();
+    mq.addEventListener?.('change', apply);
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
 
-  const isDark = themeMode === 'dark';
-  const isCrescere = themeMode === 'crescere';
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMobileMenu();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobileOpen, closeMobileMenu]);
 
-  // --- DYNAMIC FONT SIZES ---
-  const getNavTextSize = () => {
-      switch(fontSize) {
-          case 'small': return 'text-xs';
-          case 'large': return 'text-sm';
-          case 'extra-large': return 'text-base';
-          default: return 'text-[13px]'; // Normal
-      }
-  };
+  useEffect(() => {
+    if (!isTabletOrBelow || !isMobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isTabletOrBelow, isMobileOpen]);
 
-  const getLogoTextSize = () => {
-      switch(fontSize) {
-          case 'small': return 'text-sm';
-          case 'large': return 'text-lg';
-          case 'extra-large': return 'text-xl';
-          default: return 'text-base';
-      }
-  };
+  /* ---------- BRAND (no divider below) ---------- */
+  const brand = (
+    <div
+      className={`flex-none h-14 md:h-16 flex items-center px-5 md:px-6 transition-all duration-300 ${
+        isMinimized ? 'lg:justify-center lg:px-0' : ''
+      }`}
+    >
+      <div className={`flex items-center ${isMinimized ? 'gap-0' : 'gap-3'}`}>
+        <div className="relative p-2 rounded-xl bg-accent text-white shadow-lg shadow-accent/25">
+          <GraduationCap size={22} />
+          <div className="pointer-events-none absolute -inset-6 blur-2xl bg-accent/20 opacity-40" />
+        </div>
 
-  const navTextClass = getNavTextSize();
-  const logoTextClass = getLogoTextSize();
+        {!isMinimized && (
+          <div className="flex flex-col leading-none">
+            <span className="font-black text-lg tracking-tight text-text-primary">
+              PNLE
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent mt-1">
+              SmartCards
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
-  // --- PREMIUM GLASS CONTAINER ---
-  const sidebarContainerClass = isDark
-    ? 'bg-[#0B1121]/80 backdrop-blur-[40px] border-r border-white/5 shadow-2xl'
-    : 'bg-white/60 backdrop-blur-[40px] border-r border-white/40 shadow-[20px_0_40px_-10px_rgba(0,0,0,0.05)]';
+  /* ---------- NAV ---------- */
+  const nav = (
+    <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1 custom-scrollbar">
+      {NAV_ITEMS.map((item) => {
+        const isActive = currentRoute === item.name;
 
-  const dur = reduceMotion ? 0 : 300;
+        return (
+          <button
+            key={item.name}
+            onClick={() => {
+              onNavigate(item.name);
+              if (isTabletOrBelow) closeMobileMenu();
+            }}
+            className={[
+              'group relative w-full flex items-center',
+              'rounded-2xl px-4 py-3 transition-all duration-150',
+              isMinimized ? 'lg:justify-center lg:px-0' : 'gap-3',
+              isActive
+                ? 'bg-accent/10 text-accent'
+                : 'text-text-secondary hover:text-text-primary hover:bg-white/5',
+            ].join(' ')}
+            title={isMinimized ? item.name : ''}
+          >
+            {/* subtle accent rail (only on active/hover) */}
+            <span
+              className={[
+                'absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full transition-all',
+                isActive
+                  ? 'bg-accent opacity-100 shadow-lg shadow-accent/50'
+                  : 'bg-accent/60 opacity-0 group-hover:opacity-40',
+              ].join(' ')}
+            />
 
-  // --- DYNAMIC NAV ITEMS ---
-  const getNavItemClass = (isActive: boolean, isSpecial?: boolean) => {
-    const base = `relative flex items-center transition-all duration-${dur} ease-out font-bold select-none outline-none group w-full cursor-pointer min-h-[3rem] overflow-hidden`;
-    // Optimized padding for narrower sidebar
-    const layout = isMinimized 
-        ? 'justify-center p-0 rounded-xl mx-auto w-10 h-10' 
-        : 'justify-start px-3.5 py-2.5 rounded-xl mx-auto w-[92%] gap-3';
+            <div
+              className={[
+                'w-9 h-9 rounded-2xl flex items-center justify-center transition-all',
+                isActive ? 'bg-accent/10' : 'group-hover:bg-white/5',
+              ].join(' ')}
+            >
+              <item.icon size={18} strokeWidth={isActive ? 2.8 : 2} />
+            </div>
 
-    let stateClasses = '';
+            {!isMinimized && (
+              <span className="text-[11px] font-black uppercase tracking-[0.14em]">
+                {item.name}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
 
-    if (isSpecial) {
-        // Special items (Today Queue) - Keep distinct
-        if (isActive) {
-             stateClasses = 'bg-gradient-to-r from-primary/10 to-accent/10 text-primary border border-primary/30 shadow-[0_0_20px_-5px_rgba(var(--primary),0.3)]';
-        } else {
-             stateClasses = 'text-accent hover:bg-accent/10';
-        }
-    } else {
-        // Standard Items
-        if (isActive) {
-            stateClasses = isDark 
-                ? 'bg-primary/20 text-primary border border-primary/30 shadow-[0_0_15px_-3px_rgba(var(--primary),0.3)]'
-                : 'bg-primary/10 text-primary border border-primary/20 shadow-sm shadow-primary/10';
-        } else {
-            // Hover State
-            stateClasses = isDark 
-                ? 'text-slate-400 hover:text-white hover:bg-white/5' 
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80';
-        }
-    }
+  /* ---------- DESKTOP ---------- */
+  const desktopSidebar = (
+    <aside
+      className={[
+        'fixed inset-y-0 left-0 z-[250] hidden lg:flex flex-col h-full',
+        'transition-all duration-300 ease-in-out',
+        'glass-panel',
+        'ring-1 ring-white/5',
+        'shadow-[0_24px_80px_-30px_rgba(0,0,0,0.65)]',
+        isMinimized ? 'w-20' : 'w-64',
+      ].join(' ')}
+    >
+      <button
+        onClick={toggleMinimize}
+        className={[
+          'absolute -right-3 top-10 w-7 h-7 rounded-full',
+          'glass-panel border border-border-color/70',
+          'flex items-center justify-center',
+          'text-text-secondary hover:text-text-primary',
+          'hover:bg-accent/10 hover:border-accent/40 transition-all',
+          'z-[260]',
+        ].join(' ')}
+      >
+        {isMinimized ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
 
-    return `${base} ${layout} ${stateClasses}`;
-  };
+      {brand}
+      {nav}
+    </aside>
+  );
 
-  // --- LUXURY LOGO STYLES ---
-  const companionGradient = isDark
-    ? 'bg-gradient-to-r from-blue-300 via-indigo-200 to-violet-200' 
-    : 'bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500';
+  /* ---------- MOBILE / TABLET ---------- */
+  const drawer = (
+    <>
+      <div
+        className={`fixed inset-0 z-[9996] bg-black/60 backdrop-blur-sm transition-opacity ${
+          isMobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={closeMobileMenu}
+      />
 
-  // Logo Icon Background:
-  const logoIconClass = isCrescere
-    ? 'bg-gradient-to-br from-rose-400 to-amber-300 text-white shadow-lg shadow-rose-500/20'
-    : 'bg-gradient-to-br from-primary to-accent text-white shadow-lg shadow-primary/30 ring-1 ring-white/20';
+      <aside
+        className={[
+          'fixed inset-y-0 left-0 z-[9997] w-72 max-w-[85vw]',
+          'flex flex-col lg:hidden',
+          'transition-transform duration-300',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full',
+          'glass-panel ring-1 ring-white/5',
+          'shadow-[0_24px_120px_-40px_rgba(0,0,0,0.8)]',
+        ].join(' ')}
+      >
+        <div className="relative">
+          {brand}
+          <button
+            onClick={closeMobileMenu}
+            className="absolute right-3 top-3 w-9 h-9 rounded-2xl glass-panel border border-border-color/70 flex items-center justify-center hover:bg-accent/10 transition-all"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-  const handleLogoClick = () => {
-    onNavigate('dashboard');
-    if (window.innerWidth < 1024) onClose();
-  };
+        {nav}
+      </aside>
+    </>
+  );
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      <div className={`fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 lg:relative flex flex-col h-full
-          ${sidebarContainerClass}
-          ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]
-          ${isMinimized ? 'lg:w-[4.5rem]' : 'lg:w-64'} 
-          md:rounded-r-[2.5rem]
-          w-[clamp(260px,80vw,18rem)]`}
-      >
-        {/* Minimize Toggle */}
-        {onToggleMinimize && (
-          <button
-            onClick={onToggleMinimize}
-            className={`hidden lg:flex absolute -right-3 top-10 w-6 h-6 rounded-full items-center justify-center z-[60] shadow-lg border transition-all active:scale-90 hover:scale-110
-              ${isDark 
-                ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-white' 
-                : 'bg-white border-slate-100 text-slate-400 hover:text-slate-800'}`}
-          >
-            {isMinimized ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-          </button>
-        )}
-
-        {/* --- LOGO HEADER --- */}
-        <div className={`flex-none p-5 transition-all duration-300 ${isMinimized ? 'lg:p-0 lg:h-20 lg:flex lg:items-center lg:justify-center' : ''}`}>
-          <div className="flex items-center gap-3">
-            <button 
-                onClick={handleLogoClick}
-                className={`relative p-2.5 rounded-2xl shrink-0 overflow-hidden transition-transform hover:scale-105 active:scale-95 ${logoIconClass} ${isMinimized ? 'p-2' : ''}`}
-                title="Go to Dashboard"
-            >
-              <GraduationCap size={isMinimized ? 20 : 22} className="relative z-10" />
-              {/* Icon Shine */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/30 to-transparent opacity-50" />
-            </button>
-            
-            <div 
-                onClick={handleLogoClick}
-                className={`flex flex-col justify-center min-w-0 transition-opacity duration-300 cursor-pointer ${isMinimized ? 'lg:hidden' : 'block'}`}
-            >
-                <h1 className={`font-black ${logoTextClass} leading-tight tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  PNLE <br/>
-                  <span className="flex items-center gap-1.5">
-                    {/* PREMIUM GRADIENT TEXT */}
-                    <span className={`${companionGradient} bg-clip-text text-transparent filter drop-shadow-sm`}>
-                        SmartCards
-                    </span>
-                  </span>
-                </h1>
-            </div>
-            <button onClick={onClose} className="lg:hidden ml-auto p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={20} /></button>
-          </div>
-        </div>
-
-        {/* --- NAVIGATION LIST --- */}
-        <nav className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar py-2 space-y-1.5 ${isMinimized ? 'px-2' : 'px-3'}`}>
-          {navItems.map(item => {
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id as Page);
-                  if (window.innerWidth < 1024) onClose();
-                }}
-                className={getNavItemClass(isActive, item.special)}
-                title={isMinimized ? item.label : ''}
-              >
-                {/* Active Indicator Glow (Left) - Only for standard items */}
-                {isActive && !isMinimized && !item.special && (
-                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-primary shadow-[0_0_10px_rgb(var(--primary))]" />
-                )}
-
-                <span className={`relative z-10 flex items-center justify-center shrink-0 w-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-                    {item.icon}
-                </span>
-                
-                <span className={`relative z-10 ${navTextClass} font-bold tracking-tight text-left transition-opacity duration-200 ${isMinimized ? 'lg:hidden' : 'block'}`}>
-                  {item.label}
-                </span>
-                
-                {/* Active Dot (Right) - For minimized state */}
-                {isMinimized && isActive && (
-                  <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_5px_rgb(var(--primary))]" />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+      {desktopSidebar}
+      {isTabletOrBelow && createPortal(drawer, document.body)}
     </>
   );
 };

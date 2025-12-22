@@ -1,153 +1,246 @@
-import React, { useState, useEffect } from 'react';
+// App.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
-import Dashboard from './pages/Dashboard';
-import TodayQueue from './pages/TodayQueue';
-import Decks from './pages/Decks';
-import CardEditor from './pages/CardEditor';
-import TestMode from './pages/TestMode';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import Login from './pages/Login';
-import { Page, UserSettings, Card } from './types';
-import { mockQuestions } from './lib/mockData'; 
-import { useTheme } from './context/ThemeContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { useCards, useDecks } from './hooks/useData';
+import Dashboard from './components/Dashboard';
+import DeckGrid from './components/library/DeckGrid';
+import DeckBuilder from './components/library/DeckBuilder';
+import StudySession from './components/study/StudySession';
+import Browser from './components/library/Browser';
+import AnalyticsPage from './components/analytics/AnalyticsPage';
+import QuizModule from './components/quiz/QuizModule';
+import { RouteName, Deck, Flashcard } from './types';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { DataProvider } from './contexts/DataContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AuthPage from './components/auth/AuthPage';
+import { BookOpen, X, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { user, profile, loading: authLoading, signOut } = useAuth();
-  const { themeMode, toggleTheme } = useTheme();
+  const { isDark, isCrescere } = useTheme();
+  const { currentUser, loading: authLoading } = useAuth();
   
-  const { cards, loading: cardsLoading, updateCardSRS } = useCards();
-  const { decks, loading: decksLoading, refreshDecks } = useDecks();
-
-  const [activePage, setActivePage] = useState<Page>('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState<RouteName>('Dashboard');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
-  
-  const [localUser, setLocalUser] = useState<UserSettings>({
-      name: 'Loading...',
-      theme: 'dark',
-      learningStyle: 'visual',
-      cardsPerDay: 20,
-      accessibility: { fontScale: 1, reduceMotion: false }
-  });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const [isStudying, setIsStudying] = useState(false);
+  const [studyMode, setStudyMode] = useState<'standard' | 'quick-fire' | 'drill'>('standard');
+  const [isBuildingDeck, setIsBuildingDeck] = useState(false);
+  const [editingDeckId, setEditingDeckId] = useState<string | undefined>(undefined);
+  const [activeDeckId, setActiveDeckId] = useState<string | undefined>(undefined);
+  const [drillCards, setDrillCards] = useState<Flashcard[]>([]); 
+  const [focusMode, setFocusMode] = useState(false);
+
+  const [showManuals, setShowManuals] = useState(false);
+  const [isTabletOrBelow, setIsTabletOrBelow] = useState(false);
 
   useEffect(() => {
-      if(profile) {
-          setLocalUser(prev => ({...prev, ...profile}));
-      }
-  }, [profile]);
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const apply = () => setIsTabletOrBelow(mq.matches);
+    apply();
+    mq.addEventListener?.('change', apply);
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
 
-  // Refresh decks when entering deck page or editor to ensure lists are up to date
-  useEffect(() => {
-      if (activePage === 'decks' || activePage === 'create-card') {
-          refreshDecks();
-      }
-  }, [activePage]);
+  const sidebarOffsetClass = useMemo(() => {
+    if (focusMode) return '';
+    if (isTabletOrBelow) return 'lg:ml-0';
+    return isSidebarMinimized ? 'lg:ml-20' : 'lg:ml-64';
+  }, [focusMode, isTabletOrBelow, isSidebarMinimized]);
 
+  const getBackgroundClass = () => {
+    if (isCrescere) return 'bg-[#000000]';
+    if (isDark) return 'bg-[#0A0F1C]';
+    return 'bg-[#F8FAFC]';
+  };
+
+  const handleDeckSelection = (deck: Deck) => {
+    setActiveDeckId(deck.id);
+    setStudyMode('standard');
+    setDrillCards([]);
+    setIsStudying(true);
+  };
+
+  const handleCreateDeck = () => {
+    setEditingDeckId(undefined);
+    setIsBuildingDeck(true);
+  };
+
+  const handleEditDeck = (deck: Deck) => {
+    setEditingDeckId(deck.id);
+    setIsBuildingDeck(true);
+  };
+
+  const handleStartSession = () => {
+    setActiveDeckId(undefined);
+    setStudyMode('standard');
+    setDrillCards([]);
+    setIsStudying(true);
+  };
+
+  const handleQuickFire = () => {
+    setActiveDeckId(undefined);
+    setStudyMode('quick-fire');
+    setDrillCards([]);
+    setIsStudying(true);
+  };
+
+  const handleStartDrill = (cards: Flashcard[]) => {
+      setDrillCards(cards);
+      setStudyMode('drill');
+      setActiveDeckId(undefined);
+      setIsStudying(true);
+  };
+
+  const renderContent = () => {
+    if (isStudying) {
+      return (
+        <StudySession
+          deckId={activeDeckId}
+          mode={studyMode}
+          drillCards={drillCards}
+          onExit={() => setIsStudying(false)}
+          toggleFocusMode={setFocusMode}
+        />
+      );
+    }
+
+    if (isBuildingDeck) {
+      return <DeckBuilder deckId={editingDeckId} onClose={() => setIsBuildingDeck(false)} />;
+    }
+
+    switch (currentRoute) {
+      case 'Dashboard':
+        return (
+          <Dashboard
+            onStartSession={handleStartSession}
+            onQuickFire={handleQuickFire}
+            onBrowse={() => setCurrentRoute('My Decks')}
+            onOpenManuals={() => setShowManuals(true)}
+            onViewAnalytics={() => setCurrentRoute('Analytics')}
+          />
+        );
+      case 'My Decks':
+        return (
+          <div className="space-y-6">
+            <DeckGrid onSelectDeck={handleDeckSelection} onCreateDeck={handleCreateDeck} onEditDeck={handleEditDeck} />
+            <div className="border-t border-slate-500/10 pt-6">
+              <Browser />
+            </div>
+          </div>
+        );
+      case 'Quizzes':
+        return <QuizModule />;
+      case 'Analytics':
+        return <AnalyticsPage onStartDrill={handleStartDrill} />;
+      default:
+        return null;
+    }
+  };
+
+  // Auth Loading State
   if (authLoading) {
       return (
-          <div className="h-screen w-full flex items-center justify-center bg-background text-primary">
-              <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+          <div className={`h-screen w-full flex items-center justify-center ${getBackgroundClass()}`}>
+              <Loader2 className="w-10 h-10 text-accent animate-spin" />
           </div>
       );
   }
 
-  if (!user) {
-    return <Login onLogin={() => {}} />; 
+  // Not Logged In
+  if (!currentUser) {
+      return <AuthPage />;
   }
 
-  const getPageTitle = () => {
-    switch (activePage) {
-      case 'dashboard': return 'Dashboard';
-      case 'today': return 'Today Queue';
-      case 'decks': return 'My Decks';
-      case 'create-card': return 'Card Editor';
-      case 'test': return 'Practice Exam';
-      case 'analytics': return 'Analytics';
-      case 'settings': return 'Settings';
-      default: return 'PNLE SmartCards';
-    }
-  };
-
-  const renderContent = () => {
-    if (cardsLoading || decksLoading) {
-        return <div className="flex h-full items-center justify-center text-text-muted">Loading your library...</div>;
-    }
-
-    switch (activePage) {
-      case 'dashboard':
-        return <Dashboard cards={cards} decks={decks} onNavigate={setActivePage} />;
-      case 'today':
-        return <TodayQueue cards={cards} onUpdateCard={(c) => updateCardSRS(c.id, c)} />;
-      case 'decks':
-        return <Decks decks={decks} />;
-      case 'create-card':
-        return <CardEditor decks={decks} />;
-      case 'test':
-        return <TestMode questions={mockQuestions} />;
-      case 'analytics':
-        return <Analytics />;
-      case 'settings':
-        return <Settings user={localUser} onUpdateUser={setLocalUser} onLogout={signOut} />;
-      default:
-        return <Dashboard cards={cards} decks={decks} onNavigate={setActivePage} />;
-    }
-  };
-
+  // Authenticated App
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden relative transition-colors duration-500">
-      {/* 
-         MODERN BACKGROUND SYSTEM 
-         Removed "Blobs" for a more sophisticated Mesh Gradient feel 
-      */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] bg-primary/10 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen opacity-50 animate-blob"></div>
-          <div className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vw] bg-accent/10 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen opacity-50 animate-blob animation-delay-2000"></div>
-      </div>
+    <DataProvider uid={currentUser.uid}>
+        <div className={`h-screen w-full overflow-hidden transition-colors duration-500 ease-in-out font-sans ${getBackgroundClass()}`}>
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+            <div
+            className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${
+                isCrescere ? 'from-zinc-900/20 to-black' : isDark ? 'from-indigo-900/10 to-transparent' : 'from-rose-50/50 to-transparent'
+            }`}
+            />
+            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-10 bg-accent animate-blob" />
+        </div>
 
-      <Sidebar 
-        activePage={activePage} 
-        onNavigate={(p) => { setActivePage(p); setIsSidebarOpen(false); }} 
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        isMinimized={isSidebarMinimized}
-        onToggleMinimize={() => setIsSidebarMinimized(!isSidebarMinimized)}
-      />
+        <div className="flex">
+            {!focusMode && (
+            <Sidebar
+                currentRoute={currentRoute}
+                onNavigate={(route) => {
+                setCurrentRoute(route);
+                setIsStudying(false);
+                setIsBuildingDeck(false);
+                }}
+                isMinimized={isSidebarMinimized}
+                toggleMinimize={() => setIsSidebarMinimized(!isSidebarMinimized)}
+                isMobileOpen={isMobileMenuOpen}
+                closeMobileMenu={() => setIsMobileMenuOpen(false)}
+            />
+            )}
 
-      <div className="flex-1 flex flex-col h-full relative z-10 overflow-hidden">
-        <TopBar 
-          onMenuClick={() => setIsSidebarOpen(true)}
-          user={localUser} 
-          onToggleTheme={toggleTheme}
-          onLogout={signOut}
-          title={getPageTitle()}
-        />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 scroll-smooth">
-          <div className="max-w-7xl mx-auto">
-             {renderContent()}
-          </div>
-        </main>
-      </div>
+            <div className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out ${sidebarOffsetClass}`}>
+            <div className={`transition-all duration-300 flex-none ${focusMode ? '-translate-y-16' : 'translate-y-0'}`}>
+                <TopBar 
+                    currentRoute={currentRoute} 
+                    openMobileMenu={() => setIsMobileMenuOpen(true)}
+                    user={{
+                        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Nurse',
+                        email: currentUser.email || '',
+                        title: 'RN Candidate',
+                        avatarUrl: currentUser.photoURL || ''
+                    }}
+                />
+            </div>
 
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-      )}
-    </div>
+            <main className={`flex-1 overflow-y-auto custom-scrollbar ${isStudying ? '' : 'p-4 md:p-6 lg:p-8'}`}>
+                <div className="w-full">{renderContent()}</div>
+            </main>
+            </div>
+        </div>
+
+        {showManuals && (
+            <div className="fixed inset-0 z-[1050] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+            <div className={`w-full max-w-lg p-8 rounded-xl shadow-2xl relative ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'}`}>
+                <button onClick={() => setShowManuals(false)} className="absolute top-4 right-4 p-2 opacity-40 hover:opacity-100 transition-opacity">
+                <X size={20} className={isDark ? 'text-white' : 'text-slate-900'} />
+                </button>
+                <div className="flex flex-col items-center text-center gap-5">
+                <div className="p-4 rounded-xl bg-accent/10 text-accent">
+                    <BookOpen size={40} />
+                </div>
+                <div className="space-y-1">
+                    <h2 className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Study Manuals</h2>
+                    <p className={`text-sm opacity-60 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Digitized PDF reviewers for PNLE modules are currently in development. A download link will appear here soon.
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowManuals(false)}
+                    className="w-full py-3 rounded-lg bg-accent text-white font-bold text-sm uppercase tracking-widest mt-2 hover:brightness-110 active:scale-95 transition-all"
+                >
+                    Understood
+                </button>
+                </div>
+            </div>
+            </div>
+        )}
+        </div>
+    </DataProvider>
   );
 };
 
 const App: React.FC = () => {
-    return (
+  return (
+    <ThemeProvider>
         <AuthProvider>
             <AppContent />
         </AuthProvider>
-    );
-}
+    </ThemeProvider>
+  );
+};
 
 export default App;
