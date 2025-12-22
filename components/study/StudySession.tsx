@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Maximize2, Minimize2, Zap, Target, Layers, ArrowRight } from 'lucide-react';
+import { X, Maximize2, Minimize2, Zap, Target, Layers, ArrowRight, Lock, Unlock } from 'lucide-react';
 import Flashcard from './Flashcard';
 import StudyControls from './StudyControls';
 import StudySummary from './StudySummary';
@@ -34,6 +34,9 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   
   // New: Allow user to bypass limits from the "Empty" screen
   const [ignoreLimits, setIgnoreLimits] = useState(false);
+  
+  // New: Track WHY the queue is empty (True empty vs Limit reached)
+  const [limitReachedDetails, setLimitReachedDetails] = useState<{ newBlocked: number; reviewBlocked: number } | null>(null);
 
   // Focus Mode Effect
   useEffect(() => {
@@ -94,6 +97,18 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
             ? preferences.sessionSize 
             : Math.max(0, preferences.reviewCardsPerDay - dailyProgress.reviewStudied);
         
+        // CHECK: Are we blocked by limits?
+        if (!ignoreLimits && mode === 'standard') {
+            const newBlockedCount = candidatesNew.length > 0 && limitNew <= 0 ? candidatesNew.length : 0;
+            const reviewBlockedCount = candidatesDue.length > 0 && limitReview <= 0 ? candidatesDue.length : 0;
+            
+            if (newBlockedCount > 0 || reviewBlockedCount > 0) {
+                setLimitReachedDetails({ newBlocked: newBlockedCount, reviewBlocked: reviewBlockedCount });
+            } else {
+                setLimitReachedDetails(null);
+            }
+        }
+
         // D3. Select Cards
         // Priority: Due > New
         // Sort Due cards by date (oldest due first)
@@ -233,53 +248,58 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   }
 
   if (status === 'empty') {
-      const isDailyLimitReached = mode === 'standard' && !ignoreLimits;
+      const isDailyLimitReached = (mode === 'standard' && !ignoreLimits) && limitReachedDetails !== null;
+      const { newBlocked, reviewBlocked } = limitReachedDetails || { newBlocked: 0, reviewBlocked: 0 };
 
       return (
         <div className="flex h-full items-center justify-center flex-col gap-6 text-center p-6 animate-in fade-in zoom-in-95">
             <div className={`p-6 rounded-full ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
                 {isDailyLimitReached ? (
-                    <Target size={48} className="text-emerald-500 opacity-80" />
+                    <Lock size={48} className="text-amber-500 opacity-80" />
                 ) : (
-                    <Layers size={48} className="text-accent opacity-50" />
+                    <Target size={48} className="text-emerald-500 opacity-80" />
                 )}
             </div>
             
             <div className="max-w-md">
                 <h2 className={`text-2xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {isDailyLimitReached ? "Daily Goal Met!" : "All Caught Up!"}
+                    {isDailyLimitReached ? "Daily Limit Reached" : "All Caught Up!"}
                 </h2>
-                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {isDailyLimitReached 
-                        ? `You have studied your ${preferences.newCardsPerDay} new cards for the day. Great work!`
-                        : "There are no more cards matching your criteria right now."}
-                </p>
+                <div className={`text-sm leading-relaxed space-y-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {isDailyLimitReached ? (
+                        <>
+                            <p>You have hit your customized daily limits.</p>
+                            <div className="flex justify-center gap-4 text-xs font-bold uppercase tracking-widest mt-2">
+                                {newBlocked > 0 && <span className="text-blue-500">{newBlocked} New Available</span>}
+                                {reviewBlocked > 0 && <span className="text-orange-500">{reviewBlocked} Reviews Due</span>}
+                            </div>
+                        </>
+                    ) : (
+                        <p>There are no more cards matching your criteria right now.</p>
+                    )}
+                </div>
             </div>
 
-            <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
+            <div className="flex flex-col gap-3 w-full max-w-xs mt-4">
+                {isDailyLimitReached && (
+                    <button 
+                        onClick={handleContinueAnyway}
+                        className={`w-full py-4 rounded-xl bg-accent text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-accent/20 hover:brightness-110 active:scale-95 transition-all`}
+                    >
+                        <Unlock size={14} /> Continue (Cram Mode)
+                    </button>
+                )}
+
                 <button 
                     onClick={onExit} 
-                    className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all ${
+                    className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
                         isDark 
-                            ? 'bg-white text-slate-900 hover:bg-slate-200' 
-                            : 'bg-slate-900 text-white hover:bg-slate-700'
+                            ? 'bg-white/10 text-white hover:bg-white/20' 
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                     }`}
                 >
                     Return to Dashboard
                 </button>
-                
-                {isDailyLimitReached && (
-                    <button 
-                        onClick={handleContinueAnyway}
-                        className={`w-full py-3.5 rounded-xl border font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                            isDark 
-                                ? 'border-white/10 text-white hover:bg-white/5' 
-                                : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                    >
-                        <Zap size={16} /> Extend Session
-                    </button>
-                )}
             </div>
         </div>
       );
@@ -292,7 +312,7 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
   const getModeLabel = () => {
       if (mode === 'drill') return 'Weakness Drill';
       if (mode === 'quick-fire') return 'Quick Fire';
-      return ignoreLimits ? 'Extended Session' : 'Daily Review';
+      return ignoreLimits ? 'Cram Mode (Unlimited)' : 'Daily Review';
   };
 
   return (
@@ -315,7 +335,7 @@ const StudySession: React.FC<StudySessionProps> = ({ deckId, mode = 'standard', 
                     </span>
                     {mode === 'quick-fire' && <Zap size={12} className="text-accent fill-accent" />}
                     {mode === 'drill' && <Target size={12} className="text-red-500 fill-red-500" />}
-                    {ignoreLimits && <Zap size={12} className="text-yellow-500 fill-yellow-500" />}
+                    {ignoreLimits && <Unlock size={12} className="text-amber-500" />}
                  </div>
                  <div className="flex items-center gap-2">
                     <span className={`font-bold ${isDark || isFocusMode ? 'text-white' : 'text-slate-900'}`}>
