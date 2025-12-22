@@ -39,6 +39,7 @@ interface DataContextType {
   deleteDeck: (deckId: string) => void;
   copyDeck: (deckId: string) => void;
   logReview: (cardId: string, rating: CardRating) => void;
+  seedDatabase: () => Promise<void>; 
   isSeeding: boolean;
 }
 
@@ -75,6 +76,52 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
   const [preferences, setPreferences] = useState<StudyPreferences>(DEFAULT_PREFERENCES);
   const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig>(getDefaultDashboardConfig());
   const [isSeeding, setIsSeeding] = useState(false);
+  const [hasAttemptedAutoSeed, setHasAttemptedAutoSeed] = useState(false);
+
+  // --- ACTIONS ---
+
+  const seedDatabase = async () => {
+      if (isSeeding) return;
+      setIsSeeding(true);
+      console.log("Starting Auto-Seeding...");
+      try {
+          const batch = writeBatch(db);
+          
+          // 1. Seed Decks
+          INITIAL_DECKS.forEach(deck => {
+              const ref = doc(db, `users/${uid}/decks/${deck.id}`);
+              batch.set(ref, deck);
+          });
+
+          // 2. Seed Preferences
+          const prefRef = doc(db, `users/${uid}/settings/preferences`);
+          batch.set(prefRef, DEFAULT_PREFERENCES);
+          
+          // 3. Seed Dashboard Config
+          const dashRef = doc(db, `users/${uid}/settings/dashboard`);
+          batch.set(dashRef, getDefaultDashboardConfig());
+
+          await batch.commit();
+
+          // 4. Seed Cards (Chunked)
+          const CHUNK_SIZE = 300; 
+          for (let i = 0; i < SEEDED_CARDS.length; i += CHUNK_SIZE) {
+              const chunk = SEEDED_CARDS.slice(i, i + CHUNK_SIZE);
+              const cardBatch = writeBatch(db);
+              chunk.forEach(card => {
+                  const ref = doc(db, `users/${uid}/cards/${card.id}`);
+                  cardBatch.set(ref, card);
+              });
+              await cardBatch.commit();
+              console.log(`Seeded chunk ${i / CHUNK_SIZE + 1}`);
+          }
+          console.log("Seeding complete successfully.");
+      } catch (e) {
+          console.error("Seeding failed", e);
+      } finally {
+          setIsSeeding(false);
+      }
+  };
 
   // --- FIRESTORE SUBSCRIPTIONS ---
 
@@ -86,7 +133,9 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
           snapshot.forEach(doc => loadedDecks.push(doc.data() as Deck));
           setDecks(loadedDecks);
           
-          if (loadedDecks.length === 0 && !snapshot.metadata.fromCache && !isSeeding) {
+          // Auto-seed if empty and haven't tried yet
+          if (loadedDecks.length === 0 && !hasAttemptedAutoSeed && !isSeeding && snapshot.metadata.hasPendingWrites === false) {
+              setHasAttemptedAutoSeed(true);
               seedDatabase();
           }
       }, (error) => {
@@ -135,42 +184,6 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
   }, [analytics]);
 
   // --- ACTIONS ---
-
-  const seedDatabase = async () => {
-      setIsSeeding(true);
-      try {
-          const batch = writeBatch(db);
-          
-          INITIAL_DECKS.forEach(deck => {
-              const ref = doc(db, `users/${uid}/decks/${deck.id}`);
-              batch.set(ref, deck);
-          });
-
-          const prefRef = doc(db, `users/${uid}/settings/preferences`);
-          batch.set(prefRef, DEFAULT_PREFERENCES);
-          
-          const dashRef = doc(db, `users/${uid}/settings/dashboard`);
-          batch.set(dashRef, getDefaultDashboardConfig());
-
-          await batch.commit();
-
-          const CHUNK_SIZE = 400; 
-          for (let i = 0; i < SEEDED_CARDS.length; i += CHUNK_SIZE) {
-              const chunk = SEEDED_CARDS.slice(i, i + CHUNK_SIZE);
-              const cardBatch = writeBatch(db);
-              chunk.forEach(card => {
-                  const ref = doc(db, `users/${uid}/cards/${card.id}`);
-                  cardBatch.set(ref, card);
-              });
-              await cardBatch.commit();
-          }
-          console.log("Seeding complete");
-      } catch (e) {
-          console.error("Seeding failed", e);
-      } finally {
-          setIsSeeding(false);
-      }
-  };
 
   const addDeck = async (deck: Deck) => {
       await setDoc(doc(db, `users/${uid}/decks/${deck.id}`), deck);
@@ -311,7 +324,7 @@ export const DataProvider: React.FC<{ children: ReactNode; uid: string }> = ({ c
         decks, cards, quizzes, stats, preferences, dashboardConfig,
         addDeck, addCard, updateCard, deleteCard, getCardsForDeck, 
         updateStats, updatePreferences, updateDashboardConfig, resetData, updateDeck, deleteDeck, copyDeck,
-        logReview, isSeeding
+        logReview, isSeeding, seedDatabase
     }}>
       {children}
     </DataContext.Provider>

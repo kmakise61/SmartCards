@@ -500,7 +500,7 @@ const Browser: React.FC = () => {
               </div>
             </div>
           </div>
-        )))}
+        ))}
       </div>
       {visibleCount < filteredCards.length && <div className="flex justify-center pt-8"><button onClick={() => setVisibleCount(p => p + 50)} className={`${cardShell} px-6 py-3 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all`}><span className="text-text-primary">Load More</span><span className="opacity-50 text-xs">({filteredCards.length - visibleCount})</span></button></div>}
       

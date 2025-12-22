@@ -184,7 +184,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
           <div className="fixed inset-0 z-[9998]" onClick={() => setShowProfileDropdown(false)} />
           <div
             className={[
-              'fixed z-[9999] w-56 overflow-hidden',
+              'fixed z-[9999] w-64 overflow-hidden',
               'glass-panel',
               'border border-border-color/70',
               'rounded-2xl',
@@ -206,6 +206,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentRoute, openMobileMenu, user }) =
               <button onClick={() => setShowStudySettings(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors text-text-secondary hover:bg-white/5">
                 <SettingsIcon size={14} /> Preferences
               </button>
+              
               <button
                 onClick={resetData}
                 className="w-full flex items-center gap-3 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors text-red-500 hover:bg-red-500/10"
