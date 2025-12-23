@@ -7,13 +7,14 @@ import { Analytics } from './pages/Analytics';
 import { ViewState, AccentPreset, MasteryStatus, DeckId } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider } from './context/ProgressContext';
-import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2 } from 'lucide-react';
+import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone } from 'lucide-react';
 import { db } from './utils/db';
 
 const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { settings, updateSettings } = useSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [showSyncHelp, setShowSyncHelp] = useState(false);
 
   const accentOptions: { id: AccentPreset; label: string; color: string }[] = [
     { id: 'pink', label: 'Pink', color: '#F472B6' },
@@ -34,7 +35,7 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
           await navigator.share({
             files: [file],
             title: 'PNLE SmartCards Backup',
-            text: 'Here is my study progress backup.',
+            text: 'Save this file to iCloud Drive or Google Drive to sync with other devices.',
           });
           return;
         } catch (shareError) {
@@ -74,6 +75,9 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
       console.error("Import failed", e);
       setImportStatus('error');
     }
+    
+    // Reset input to allow re-selecting same file if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   if (!isOpen) return null;
@@ -157,15 +161,44 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
           </section>
 
           <section className="pt-6 border-t border-slate-100 dark:border-slate-800">
-             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Data Management</h3>
+             <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Sync</h3>
+                <button 
+                  onClick={() => setShowSyncHelp(!showSyncHelp)}
+                  className="text-[10px] font-bold text-[var(--accent)] flex items-center gap-1 hover:underline"
+                >
+                  {showSyncHelp ? 'Hide Guide' : 'How to Sync?'} <HelpCircle size={12} />
+                </button>
+             </div>
+
+             {showSyncHelp && (
+                <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-3 animate-in fade-in slide-in-from-top-1">
+                   <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 shrink-0">1</div>
+                      <p>Tap <strong>Backup</strong>. On mobile, choose "Save to Files" (iCloud) or "Drive". On PC, it downloads.</p>
+                   </div>
+                   <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 shrink-0">2</div>
+                      <p>Open this app on your other device.</p>
+                   </div>
+                   <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 shrink-0">3</div>
+                      <p>Tap <strong>Restore</strong> and select the file you saved in Step 1.</p>
+                   </div>
+                   <div className="flex items-center justify-center gap-4 pt-2 text-[var(--accent)] opacity-50">
+                      <Smartphone size={16} /> <Cloud size={16} /> <Monitor size={16} />
+                   </div>
+                </div>
+             )}
+
              <div className="flex flex-col gap-3">
                 <button 
                   onClick={handleExport}
                   className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all group"
                 >
                    <div className="flex flex-col items-start">
-                      <span className="text-xs font-bold">Sync / Backup</span>
-                      <span className="text-[9px] text-slate-400">Share or Download JSON</span>
+                      <span className="text-xs font-bold">Backup Progress</span>
+                      <span className="text-[9px] text-slate-400">Export JSON file</span>
                    </div>
                    <div className="flex gap-2">
                       <Share2 size={18} className="text-slate-300 group-hover:text-[var(--accent)] transition-colors" />
@@ -186,8 +219,8 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                     className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-500 transition-all group"
                   >
                     <div className="flex flex-col items-start">
-                        <span className="text-xs font-bold">Restore Data</span>
-                        <span className="text-[9px] text-slate-400">Import JSON backup</span>
+                        <span className="text-xs font-bold">Restore Progress</span>
+                        <span className="text-[9px] text-slate-400">Import JSON file</span>
                     </div>
                     <Upload size={18} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
                   </button>
