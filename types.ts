@@ -31,11 +31,12 @@ export interface FlashcardUI extends Flashcard {
   stableCount: number;
   criticalCount: number;
   seen: boolean;
+  isFlagged: boolean; // New: User bookmark
   lastGrade: GradeStatus | null;
 }
 
 export type ViewState = 'dashboard' | 'flashcards' | 'analytics';
-export type FlashcardsViewMode = 'decks' | 'sets' | 'details' | 'study';
+export type FlashcardsViewMode = 'decks' | 'sets' | 'details' | 'study' | 'browser';
 export type AccentPreset = 'pink' | 'rose' | 'violet' | 'cyan';
 
 export interface UserSettings {
@@ -55,6 +56,7 @@ export interface MasteryRecord {
   goodCount: number;
   criticalCount: number;
   lastGrade: GradeStatus | null;
+  isFlagged?: boolean; // New: Persist flag
   updatedAt: number;
 }
 
@@ -91,4 +93,12 @@ export interface LastSessionState {
   currentIndex: number;
   masteryFilters: MasteryStatus[];
   timestamp: number;
+}
+
+export interface SessionFilters {
+  mastery?: MasteryStatus[];
+  deckId?: DeckId;
+  setId?: string;
+  cardIds?: string[];
+  onlyFlagged?: boolean; // New: Filter by flagged
 }

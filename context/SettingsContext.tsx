@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserSettings, AccentPreset } from '../types';
 import { db } from '../utils/db';
@@ -28,6 +29,12 @@ const SOFT_MODE_ACCENT = { main: '#0D9488', soft: 'rgba(13, 148, 136, 0.1)', glo
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+// Helper to convert Hex to RGB string (e.g. "255, 0, 0")
+const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+};
+
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -53,9 +60,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const colors = settings.softMode ? SOFT_MODE_ACCENT : ACCENT_COLORS[settings.accent];
     const root = document.documentElement;
+    
     root.style.setProperty('--accent', colors.main);
     root.style.setProperty('--accent-soft', colors.soft);
     root.style.setProperty('--accent-glow', colors.glow);
+    
+    // Set RGB components for rgba() usage in CSS
+    const rgb = hexToRgb(colors.main);
+    root.style.setProperty('--accent-rgb', rgb);
+    
   }, [settings]);
 
   const updateSettings = (updates: Partial<UserSettings>) => {

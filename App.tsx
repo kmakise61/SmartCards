@@ -4,7 +4,7 @@ import { Topbar } from './components/Topbar';
 import { Dashboard } from './pages/Dashboard';
 import { Flashcards } from './pages/Flashcards';
 import { Analytics } from './pages/Analytics';
-import { ViewState, AccentPreset, MasteryStatus, DeckId } from './types';
+import { ViewState, AccentPreset, MasteryStatus, DeckId, SessionFilters } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider } from './context/ProgressContext';
 import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone } from 'lucide-react';
@@ -145,19 +145,6 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                 <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
               </div>
             </label>
-
-            <label className="flex items-center justify-between p-1 cursor-pointer">
-              <span className="text-xs font-semibold">Keyboard hints</span>
-              <div className="relative inline-flex items-center">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.showKeyboardHints} 
-                  onChange={(e) => updateSettings({ showKeyboardHints: e.target.checked })}
-                />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-              </div>
-            </label>
           </section>
 
           <section className="pt-6 border-t border-slate-100 dark:border-slate-800">
@@ -249,7 +236,7 @@ const MainContent: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [flashcardFilters, setFlashcardFilters] = useState<{ mastery?: MasteryStatus[], deckId?: DeckId, setId?: string } | undefined>(undefined);
+  const [flashcardFilters, setFlashcardFilters] = useState<SessionFilters | undefined>(undefined);
   const [isResuming, setIsResuming] = useState(false);
   const [flashcardsKey, setFlashcardsKey] = useState(0);
 
@@ -271,7 +258,7 @@ const MainContent: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const startSession = (filters?: { mastery?: MasteryStatus[], deckId?: DeckId, setId?: string }, resume = false) => {
+  const startSession = (filters?: SessionFilters, resume = false) => {
     setFlashcardFilters(filters);
     setIsResuming(resume);
     setCurrentView('flashcards');
@@ -316,7 +303,7 @@ const MainContent: React.FC = () => {
             </div>
           ) : currentView === 'analytics' ? (
             <div className="h-full overflow-y-auto">
-              <Analytics />
+              <Analytics onStartSession={startSession} />
             </div>
           ) : (
             <Flashcards 
@@ -353,15 +340,6 @@ const MainContent: React.FC = () => {
           >
             <BarChart2 size={20} />
             <span className="text-[9px] font-black uppercase tracking-widest">Stats</span>
-          </button>
-          <button 
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex flex-col items-center gap-1 text-slate-400"
-          >
-            <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700">
-               <img src="https://picsum.photos/seed/nurse/50" alt="Profile" className="w-full h-full object-cover" />
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-widest">Me</span>
           </button>
       </nav>
 

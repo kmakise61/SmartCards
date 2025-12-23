@@ -6,6 +6,7 @@ interface ProgressContextType {
   progress: Record<string, MasteryRecord>;
   lastSession: LastSessionState | null;
   applyGrade: (cardId: string, grade: GradeStatus) => void;
+  toggleFlag: (cardId: string) => void;
   setLastActive: (deckId: DeckId | null, setId: string | null, currentIndex?: number, masteryFilters?: MasteryStatus[]) => void;
   getStats: (cardIds: string[]) => { total: number; unseen: number; learning: number; mastered: number };
   getCardMastery: (seen: boolean, goodCount: number) => MasteryStatus;
@@ -45,7 +46,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const applyGrade = useCallback((cardId: string, grade: GradeStatus) => {
     setProgress(prev => {
-      const current = prev[cardId] || { seen: false, goodCount: 0, criticalCount: 0, lastGrade: null, updatedAt: 0 };
+      const current = prev[cardId] || { seen: false, goodCount: 0, criticalCount: 0, lastGrade: null, updatedAt: 0, isFlagged: false };
       let newGoodCount = current.goodCount;
       let newCriticalCount = current.criticalCount || 0;
 
@@ -55,9 +56,9 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } else if (grade === 'good') {
         newGoodCount += 1; // Increment immediately
       }
-      // 'hard' keeps current goodCount but marks as seen/learning
 
       const newRecord: MasteryRecord = {
+        ...current, // Keep isFlagged and other existing data
         seen: true,
         goodCount: newGoodCount,
         criticalCount: newCriticalCount,
@@ -68,6 +69,20 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // Save individually to DB (Fire and forget)
       db.saveCardProgress(cardId, newRecord).catch(e => console.error("Failed to save card progress", e));
 
+      return {
+        ...prev,
+        [cardId]: newRecord
+      };
+    });
+  }, []);
+
+  const toggleFlag = useCallback((cardId: string) => {
+    setProgress(prev => {
+      const current = prev[cardId] || { seen: false, goodCount: 0, criticalCount: 0, lastGrade: null, updatedAt: 0, isFlagged: false };
+      const newRecord = { ...current, isFlagged: !current.isFlagged, updatedAt: Date.now() };
+      
+      db.saveCardProgress(cardId, newRecord).catch(e => console.error("Failed to save flag", e));
+      
       return {
         ...prev,
         [cardId]: newRecord
@@ -94,7 +109,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   if (!loaded) return null; // Or a loading spinner
 
   return (
-    <ProgressContext.Provider value={{ progress, lastSession, applyGrade, setLastActive, getStats, getCardMastery }}>
+    <ProgressContext.Provider value={{ progress, lastSession, applyGrade, toggleFlag, setLastActive, getStats, getCardMastery }}>
       {children}
     </ProgressContext.Provider>
   );

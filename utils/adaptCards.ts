@@ -38,6 +38,7 @@ export const adaptCards = (): FlashcardUI[] => {
       stableCount: 0,         
       criticalCount: 0,
       seen: false,
+      isFlagged: false,
       lastGrade: null,
     });
   });

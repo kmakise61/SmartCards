@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { RotateCw, Lightbulb, ShieldCheck, Zap, BookOpen, Volume2, Info } from 'lucide-react';
+import { RotateCw, Lightbulb, ShieldCheck, Zap, BookOpen, Volume2, Info, Keyboard, Star } from 'lucide-react';
 import { FlashcardUI } from '../types';
 
 interface FlashcardCardProps {
   card: FlashcardUI;
   isFlipped: boolean;
   onFlip: () => void;
+  onToggleFlag?: () => void;
+  textSize?: 'normal' | 'large';
 }
 
 const MasteryIcon: React.FC<{ status: string }> = ({ status }) => {
@@ -39,7 +41,9 @@ const MarkdownText: React.FC<{ text: string, className?: string, anchorFirst?: b
 export const FlashcardCard: React.FC<FlashcardCardProps> = ({
   card,
   isFlipped,
-  onFlip
+  onFlip,
+  onToggleFlag,
+  textSize = 'normal'
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +53,19 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
   }, [card.id, isFlipped]);
 
   const isShortQuestion = card.question.length < 80;
+  
+  // Dynamic text sizing classes
+  const questionSize = textSize === 'large' 
+    ? 'text-2xl sm:text-4xl md:text-5xl lg:text-6xl' 
+    : (isShortQuestion ? 'text-xl sm:text-3xl md:text-4xl lg:text-5xl' : 'text-lg sm:text-xl md:text-3xl');
+    
+  const answerSize = textSize === 'large'
+    ? 'text-xl md:text-4xl'
+    : 'text-lg md:text-3xl';
+    
+  const bodySize = textSize === 'large'
+    ? 'text-base md:text-xl'
+    : 'text-xs md:text-base';
 
   const handleTTS = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,6 +100,17 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
               </div>
               <div className="flex items-center gap-1 md:gap-2">
                  <button
+                  onClick={(e) => { e.stopPropagation(); onToggleFlag?.(); }}
+                  className={`p-2 rounded-xl transition-all active:scale-90 touch-manipulation ${
+                    card.isFlagged 
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-400' 
+                      : 'text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-yellow-400'
+                  }`}
+                  title="Star this card"
+                >
+                  <Star size={20} className={`md:w-5 md:h-5 ${card.isFlagged ? 'fill-current' : ''}`} />
+                </button>
+                 <button
                   onClick={handleTTS}
                   className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[var(--accent)] transition-colors active:scale-95 touch-manipulation"
                   title="Read aloud"
@@ -100,7 +128,7 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
               <div className="h-full flex flex-col justify-center py-2 md:py-4">
                 <div className="text-[8px] md:text-[10px] font-black text-[var(--accent)] opacity-40 uppercase tracking-[0.3em] mb-3 md:mb-6">Board Validation Check</div>
                 <h2 className={`
-                  ${isShortQuestion ? 'text-xl sm:text-3xl md:text-4xl lg:text-5xl' : 'text-lg sm:text-xl md:text-3xl'} 
+                  ${questionSize} 
                   font-black text-slate-900 dark:text-white leading-tight tracking-tight
                 `}>
                   <MarkdownText text={card.question} />
@@ -111,9 +139,7 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
             <div className="flex-none p-4 md:p-6 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center text-[9px] font-bold text-slate-400">
               <span className="font-mono opacity-50">REF_{card.displayId}</span>
               <span className="uppercase tracking-[0.2em] group-hover/card:text-[var(--accent)] transition-colors flex items-center gap-2">
-                <span className="hidden md:inline">Tap space to flip</span>
-                <span className="md:hidden">Tap card to reveal</span>
-                <Info size={10} />
+                <Keyboard size={10} /> <span className="hidden md:inline">Tap Space to Flip</span>
               </span>
             </div>
           </div>
@@ -129,13 +155,25 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
                 <Lightbulb size={12} className="text-yellow-500 fill-yellow-500" />
                 <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Rationale</span>
               </div>
-               <button
-                  onClick={handleTTS}
-                  className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-emerald-500 transition-colors touch-manipulation"
-                  title="Read aloud"
-                >
-                  <Volume2 size={18} className="md:w-5 md:h-5" />
-                </button>
+               <div className="flex items-center gap-2">
+                 <button
+                    onClick={(e) => { e.stopPropagation(); onToggleFlag?.(); }}
+                    className={`p-2 rounded-xl transition-all active:scale-90 touch-manipulation ${
+                      card.isFlagged 
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-400' 
+                        : 'text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-yellow-400'
+                    }`}
+                  >
+                    <Star size={20} className={`md:w-5 md:h-5 ${card.isFlagged ? 'fill-current' : ''}`} />
+                  </button>
+                 <button
+                    onClick={handleTTS}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-emerald-500 transition-colors touch-manipulation"
+                    title="Read aloud"
+                  >
+                    <Volume2 size={18} className="md:w-5 md:h-5" />
+                  </button>
+               </div>
             </div>
 
             <div 
@@ -146,7 +184,7 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
               <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
                 <div>
                   <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Validated Response</div>
-                  <div className="text-lg md:text-3xl font-black text-emerald-600 dark:text-emerald-400 leading-tight">
+                  <div className={`${answerSize} font-black text-emerald-600 dark:text-emerald-400 leading-tight`}>
                     <MarkdownText text={card.answer} anchorFirst />
                   </div>
                 </div>
@@ -154,7 +192,7 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
                 <div className="bg-white dark:bg-darkcard p-4 md:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative">
                   <div className="absolute -left-1 top-6 md:top-8 w-1 h-8 md:h-12 bg-emerald-500/50 rounded-r-full" />
                   <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Analysis</div>
-                  <div className="text-xs md:text-base text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                  <div className={`${bodySize} text-slate-600 dark:text-slate-300 font-medium leading-relaxed`}>
                     <MarkdownText text={card.rationale} anchorFirst />
                   </div>
                 </div>
@@ -162,10 +200,12 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
             </div>
 
             <div className="flex-none p-4 md:p-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              <span className="hidden md:inline">Use keys 1, 2, 3 to rate</span>
-              <span className="md:hidden">Rate below</span>
               <div className="flex items-center gap-2 opacity-50 hover:opacity-100 transition-opacity cursor-pointer p-2" onClick={onFlip}>
                 <RotateCw size={12} /> <span className="hidden md:inline">Flip Back</span>
+              </div>
+              <div className="flex items-center gap-2">
+                 <Keyboard size={12} className="text-slate-300" />
+                 <span className="hidden md:inline opacity-60">Keys: 1 (Again), 3 (Good)</span>
               </div>
             </div>
           </div>

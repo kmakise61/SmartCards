@@ -1,12 +1,11 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { adaptCards } from '../utils/adaptCards';
-import { MasteryStatus, DeckId, DeckConfig } from '../types';
+import { MasteryStatus, DeckConfig, SessionFilters } from '../types';
 import { DECK_LIST } from '../data/deck_config';
 import { useProgress } from '../context/ProgressContext';
 import { useSettings } from '../context/SettingsContext';
 import { 
-  Zap, 
   Activity, 
   ShieldCheck, 
   ChevronRight, 
@@ -16,16 +15,17 @@ import {
   Filter,
   Brain,
   HeartPulse,
-  Waves
+  Zap,
+  Waves,
+  Clock,
+  TrendingUp,
+  Target
 } from 'lucide-react';
 
 interface DashboardProps {
-  onStartSession: (filters?: { mastery?: MasteryStatus[], deckId?: DeckId, setId?: string }, resume?: boolean) => void;
+  onStartSession: (filters?: SessionFilters, resume?: boolean) => void;
 }
 
-/**
- * Derives comprehensive dashboard metrics from raw cards and progress records.
- */
 const calculateDashboardStats = (
   allCards: any[], 
   progress: Record<string, any>, 
@@ -73,7 +73,7 @@ const calculateDashboardStats = (
   if (overallMastery > 85) rank = "Expert";
   else if (overallMastery > 60) rank = "Proficient";
   else if (overallMastery > 30) rank = "Competent";
-  else if (overallMastery > 10) rank = "Advanced Beginner";
+  else if (overallMastery > 10) rank = "Adv. Beginner";
 
   const lowestCoreDeckId = DECK_LIST.reduce((prev, curr) => {
     const prevProg = metrics[prev.id]?.progress || 0;
@@ -95,9 +95,17 @@ const calculateDashboardStats = (
 export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
   const { progress, getCardMastery, lastSession } = useProgress();
   const { settings, updateSettings } = useSettings();
+  const [greeting, setGreeting] = useState('Welcome');
+  
+  // Time-aware greeting logic
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 18) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
   
   const allCards = useMemo(() => adaptCards(), []);
-  
   const stats = useMemo(() => 
     calculateDashboardStats(allCards, progress, getCardMastery), 
     [allCards, progress, getCardMastery]
@@ -117,192 +125,240 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
 
     const renderLogo = () => {
       switch (deck.id) {
-        case 'NP1': return <Waves size={18} />;
-        case 'NP2': return <HeartPulse size={18} />;
-        case 'NP3': return <Activity size={18} />;
-        case 'NP4': return <Stethoscope size={18} />;
-        case 'NP5': return <Brain size={18} />;
-        case 'PHARM_LABS': return <Zap size={18} />;
-        case 'PRIO_DEL': return <ShieldCheck size={18} />;
-        default: return <Activity size={18} />;
+        case 'NP1': return <Waves size={20} />;
+        case 'NP2': return <HeartPulse size={20} />;
+        case 'NP3': return <Activity size={20} />;
+        case 'NP4': return <Stethoscope size={20} />;
+        case 'NP5': return <Brain size={20} />;
+        case 'PHARM_LABS': return <Zap size={20} />;
+        case 'PRIO_DEL': return <ShieldCheck size={20} />;
+        default: return <Activity size={20} />;
       }
     };
 
     return (
       <button 
         onClick={() => onStartSession({ deckId: deck.id })}
-        className="w-full bg-white dark:bg-darkcard p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 hover:border-[var(--accent)] hover:shadow-soft transition-all duration-300 flex items-center justify-between group text-left relative overflow-hidden"
+        className="w-full p-5 rounded-3xl transition-all duration-300 flex flex-col gap-4 group text-left relative overflow-hidden
+          bg-white dark:bg-darkcard/40 backdrop-blur-md
+          border border-slate-200/80 dark:border-white/5
+          shadow-sm hover:shadow-lg hover:border-[var(--accent)]/40 hover:-translate-y-1 active:scale-[0.98]"
       >
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center text-slate-400 group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-all duration-300 flex-shrink-0 shadow-sm">
+        <div className="flex items-center justify-between w-full relative z-10">
+          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-[var(--accent)] group-hover:text-white transition-all duration-300 border border-slate-100 dark:border-white/5 shadow-sm">
             {renderLogo()}
           </div>
-          <div className="truncate pr-2">
-            <h4 className="font-black text-slate-800 dark:text-white text-xs leading-none mb-2 uppercase tracking-tight">{deck.title}</h4>
-            <div className="flex items-center gap-2">
-               <div className="h-1.5 w-16 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full bg-[var(--accent)] transition-all duration-1000 ease-out ${m.progress === 0 ? 'opacity-0' : 'opacity-100'}`} 
-                    style={{ width: `${m.progress}%` }} 
-                  />
-               </div>
-               <span className={`text-[8px] font-black uppercase tracking-widest ${m.progress === 0 ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400'}`}>
-                 {m.progress}%
-               </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-black text-slate-300 dark:text-slate-600 tracking-widest uppercase">{deck.id}</span>
+            <div className="p-1 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-slate-400 group-hover:text-[var(--accent)] transition-all">
+              <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
         </div>
         
-        <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/30 text-slate-300 group-hover:text-[var(--accent)] group-hover:bg-[var(--accent-soft)] transition-all">
-          <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+        <div className="space-y-3 relative z-10 w-full">
+          <h4 className="font-bold text-slate-800 dark:text-white text-sm leading-tight group-hover:text-[var(--accent)] transition-colors line-clamp-1">
+            {deck.title}
+          </h4>
+          
+          <div className="space-y-1.5">
+             <div className="flex justify-between items-center px-0.5">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Mastery</span>
+                <span className="text-[9px] font-black text-[var(--accent)]">
+                  {m.progress}%
+                </span>
+             </div>
+             <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[var(--accent)] transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(var(--accent-glow),0.5)]" 
+                  style={{ width: `${m.progress}%` }} 
+                />
+             </div>
+          </div>
         </div>
       </button>
     );
   };
 
   return (
-    <div className="p-4 md:p-10 max-w-[1500px] mx-auto space-y-8 animate-fade-in pb-24">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Status: {stats.rank}</span>
-          </div>
-          <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
-            Learning <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] to-rose-400">Mastery Dashboard</span>
-          </h1>
-        </div>
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-24 relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--accent-soft),_transparent_50%)] pointer-events-none opacity-40 mix-blend-screen" />
+
+      {/* --- GRID LAYOUT START --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative z-10">
         
-        <div className="flex flex-wrap items-center gap-3">
-          {lastSession?.setId && (
-            <button 
-              onClick={() => onStartSession({}, true)}
-              className="flex items-center gap-3 bg-[var(--accent)] px-6 py-4 rounded-3xl border-2 border-white dark:border-slate-800 shadow-[0_20px_40px_rgba(var(--accent-glow),0.4)] hover:scale-105 transition-all group"
-            >
-               <div className="flex flex-col items-end">
-                  <span className="text-[9px] font-black text-white/70 uppercase tracking-widest leading-none mb-1">Quick Resume</span>
-                  <span className="text-xs font-black text-white">{lastSession.deckId || 'Active'} Module</span>
-               </div>
-               <div className="w-10 h-10 rounded-xl bg-white text-[var(--accent)] flex items-center justify-center group-hover:rotate-12 transition-transform shadow-xl">
-                  <ArrowRight size={18} />
-               </div>
-            </button>
-          )}
-        </div>
-      </div>
+        {/* === LEFT COLUMN (Hero + Domains) === */}
+        <div className="lg:col-span-8 space-y-8">
+          
+          {/* 1. HERO CARD (Visual Anchor) - MINIMIZED */}
+          <div className="relative group overflow-hidden rounded-[2.5rem] border shadow-2xl min-h-[220px] flex items-center transition-all duration-500
+            bg-white border-white/20 
+            dark:bg-slate-950 dark:border-[var(--accent)]/40 
+            dark:shadow-[0_0_50px_rgba(var(--accent-rgb),0.15)]
+          ">
+            {/* LIGHT MODE: Vibrant Gradient (Now simpler to respect accent) */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-indigo-600 opacity-90 dark:opacity-0 transition-opacity duration-500" />
+            
+            {/* DARK MODE: Deep Space with Radial Glow (Using RGB var for proper opacity) */}
+            <div className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_top_right,_rgba(var(--accent-rgb),0.25),_transparent_70%)]" />
+            
+            {/* Texture Overlay (Common) */}
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+            
+            <div className="relative p-6 md:p-8 z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 w-full">
+              <div className="flex-1 space-y-3 md:space-y-4 text-center md:text-left">
+                {/* Badge Row */}
+                <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
+                   <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-white border border-white/20 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {stats.rank} Tier
+                   </div>
+                   {lastSession?.setId && (
+                     <div className="hidden sm:flex items-center gap-2 text-white/70 text-[9px] font-bold uppercase tracking-widest border-l border-white/20 pl-3">
+                       <Clock size={10} /> Resuming Session
+                     </div>
+                   )}
+                </div>
+                
+                {/* Typography (Scaled Down) */}
+                <div className="space-y-2">
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[0.95] tracking-tight drop-shadow-md">
+                    {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/60">Future RN!</span>
+                  </h1>
+                  <p className="text-white/90 font-medium text-xs md:text-sm leading-relaxed max-w-md mx-auto md:mx-0 text-shadow-sm">
+                    High-velocity validation modules ready.
+                  </p>
+                </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
-        <div className="lg:col-span-8 space-y-12">
-          <div className="relative group overflow-hidden rounded-[3rem]">
-            <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] via-rose-500 to-indigo-600 opacity-90 transition-transform duration-1000 group-hover:scale-105" />
-            <div className="relative p-10 md:p-14 z-10 flex flex-col items-start gap-8">
-              <div className="inline-flex items-center gap-3 bg-white/20 backdrop-blur-xl px-4 py-2 rounded-2xl text-white border border-white/20 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
-                 <Zap size={14} fill="currentColor" className="text-yellow-300" /> Strategic Validation
-              </div>
-              
-              <div className="space-y-4 max-w-lg">
-                <h2 className="text-4xl md:text-5xl font-black text-white leading-[1.1] tracking-tighter">
-                  Unified Clinical <br/> Learning Engine
-                </h2>
-                <p className="text-white/80 font-medium text-sm md:text-base leading-relaxed">
-                  Analyze high-yield concepts across all NP Domains, Pharmacology, and Delegation protocols in one centralized validation loop.
-                </p>
+                {/* CTAs */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
+                  <button 
+                    onClick={() => lastSession?.setId ? onStartSession({}, true) : onStartSession({ deckId: 'NP1' })}
+                    className="bg-white text-slate-900 px-6 py-3 rounded-2xl font-black shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em] flex items-center gap-3 group/btn w-full sm:w-auto justify-center"
+                  >
+                    {lastSession?.setId ? 'Resume' : 'Start'} 
+                    <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </div>
 
+              {/* Illustration (Smaller) */}
+              <div className="hidden md:block relative w-40 h-40 shrink-0">
+                 <div className="absolute inset-0 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm animate-[spin_60s_linear_infinite]" />
+                 <div className="absolute inset-2 bg-white/5 rounded-full border border-white/10 animate-[spin_40s_linear_infinite_reverse]" />
+                 <div className="absolute inset-0 flex items-center justify-center text-white/40">
+                    <Activity size={60} strokeWidth={1} />
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. DOMAINS GRID */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <h3 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                <Brain size={16} className="text-[var(--accent)]" /> Knowledge Architecture
+              </h3>
               <button 
-                onClick={() => onStartSession({ deckId: 'NP1' })}
-                className="bg-white text-[var(--accent)] px-10 py-5 rounded-2xl font-black shadow-[0_20px_40px_rgba(0,0,0,0.15)] hover:bg-slate-50 hover:-translate-y-1 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] flex items-center gap-3 group/btn"
+                onClick={() => updateSettings({ sortByLowest: !settings.sortByLowest })}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${settings.sortByLowest ? 'bg-[var(--accent)] text-white border-transparent shadow-lg shadow-[var(--accent-glow)]' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-white/10'}`}
               >
-                Launch Unified Loop <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
+                <Filter size={10} /> {settings.sortByLowest ? 'Focus Priority' : 'Standard Sort'}
               </button>
             </div>
-          </div>
-
-          <div className="space-y-8">
-            <div className="flex items-center justify-between px-2">
-              <h3 className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.5em] flex items-center gap-3">
-                <Brain size={18} className="text-[var(--accent)]" /> Knowledge Domains
-              </h3>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => updateSettings({ sortByLowest: !settings.sortByLowest })}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${settings.sortByLowest ? 'bg-[var(--accent)] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                >
-                  <Filter size={12} /> {settings.sortByLowest ? 'Lowest First' : 'Default Sort'}
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            {/* Grid Logic: 1 col mobile, 2 col tablet, 3 col desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {sortedDecks.map(deck => <DomainCard key={deck.id} deck={deck} />)}
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-10">
-          <div className="bg-white dark:bg-darkcard rounded-[3rem] p-10 border border-slate-100 dark:border-slate-800 shadow-soft relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-slate-900 dark:text-white group-hover:scale-110 transition-transform duration-700 pointer-events-none">
-                <Trophy size={160} />
-             </div>
-             
-             <div className="relative z-10 text-center space-y-8">
-                <div className="flex justify-center">
-                   <div className="relative">
-                      <div className="w-48 h-48 rounded-full border-[10px] border-slate-50 dark:border-slate-800 flex items-center justify-center shadow-inner">
-                         <div className="text-center">
-                            <div className="text-6xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.overallMastery}%</div>
-                            <div className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mt-2">{stats.rank}</div>
-                         </div>
+        {/* === RIGHT COLUMN (Stats & Strategy) === */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
+          
+          {/* 3. MASTERY WIDGET */}
+          <div className="bg-white/80 dark:bg-darkcard/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-200/60 dark:border-white/5 shadow-soft relative overflow-hidden group">
+             <div className="relative z-10 flex flex-col items-center text-center space-y-8">
+                
+                {/* Chart */}
+                <div className="relative">
+                   <div className="w-48 h-48 rounded-full border-[12px] border-slate-100 dark:border-slate-800 flex items-center justify-center shadow-inner">
+                      <div className="text-center">
+                         <div className="text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.overallMastery}%</div>
+                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-2">Proficiency</div>
                       </div>
-                      <svg className="absolute top-0 left-0 w-48 h-48 -rotate-90">
-                        <circle 
-                          cx="96" cy="96" r="86" 
-                          fill="transparent" 
-                          stroke="var(--accent)" 
-                          strokeWidth="10" 
-                          strokeDasharray={540} 
-                          strokeDashoffset={540 - (540 * stats.overallMastery) / 100}
-                          strokeLinecap="round"
-                          className="transition-all duration-1000 ease-out"
-                        />
-                      </svg>
                    </div>
+                   <svg className="absolute top-0 left-0 w-48 h-48 -rotate-90 drop-shadow-[0_0_10px_rgba(var(--accent-glow),0.4)]">
+                     <circle 
+                       cx="96" cy="96" r="84" 
+                       fill="transparent" 
+                       stroke="var(--accent)" 
+                       strokeWidth="12" 
+                       strokeDasharray={527} 
+                       strokeDashoffset={527 - (527 * stats.overallMastery) / 100}
+                       strokeLinecap="round"
+                       className="transition-all duration-1000 ease-out"
+                     />
+                   </svg>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-50 dark:border-slate-800 pt-8">
-                   <div className="space-y-1">
-                      <div className="text-2xl font-black text-slate-800 dark:text-slate-200">{stats.seenCount}</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Concepts Seen</div>
+                {/* Metrics Row */}
+                <div className="grid grid-cols-2 gap-4 w-full border-t border-slate-100 dark:border-white/5 pt-6">
+                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                      <div className="text-2xl font-black text-slate-800 dark:text-white">{stats.seenCount}</div>
+                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Seen</div>
                    </div>
-                   <div className="space-y-1">
-                      <div className="text-2xl font-black text-emerald-500">{stats.masteredCount}</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Mastered</div>
+                   <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10">
+                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.masteredCount}</div>
+                      <div className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Mastered</div>
                    </div>
                 </div>
 
                 <button 
                    onClick={() => onStartSession({ mastery: ['learning'] })}
-                   className="w-full py-4 bg-slate-50 dark:bg-slate-800 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                   className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-[1.02] active:scale-[0.98] rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg"
                 >
-                  Review Weak Points
+                  Bridge Weak Links
                 </button>
+             </div>
+             
+             {/* BG Deco */}
+             <div className="absolute top-[-10%] right-[-10%] opacity-[0.03] text-slate-900 dark:text-white pointer-events-none">
+                <Trophy size={200} />
              </div>
           </div>
 
-          <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30 space-y-4">
-              <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-800/40 flex items-center justify-center text-indigo-500">
-                    <Activity size={18} />
+          {/* 4. CLINICAL PROTOCOL CARD (High Contrast Dark Mode) */}
+          <div className="relative overflow-hidden rounded-[2.5rem] p-8 border transition-all duration-300
+            bg-white border-indigo-50/50 shadow-sm
+            dark:bg-slate-900 dark:border-indigo-500/30 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
+          ">
+              {/* Dark Mode Glow Effect */}
+              <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none" />
+
+              <div className="flex items-center gap-4 mb-6 relative z-10">
+                 <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 flex items-center justify-center shrink-0">
+                    <Target size={24} />
                  </div>
-                 <h4 className="text-[10px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-[0.2em]">Clinical Protocol</h4>
+                 <div>
+                   <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Strategic Protocol</h4>
+                   <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400"> AI-Driven Insight</span>
+                 </div>
               </div>
-              <p className="text-xs text-indigo-800/70 dark:text-indigo-400/70 font-medium leading-relaxed italic">
-                {stats.overallMastery < 20 
-                  ? `Focus on ${stats.lowestCoreDeckId.id}: ${stats.lowestCoreDeckId.subtitle} to stabilize your baseline score across the unified curriculum.`
-                  : `Clinical performance is high. Proceed with active validation in ${stats.lowestCoreDeckId.id} to maintain expert rank.`}
-              </p>
+              
+              <div className="relative z-10 pl-4 border-l-2 border-indigo-100 dark:border-indigo-500/40">
+                <p className="text-xs text-slate-600 dark:text-indigo-200/80 font-medium leading-relaxed">
+                  {stats.overallMastery < 20 
+                    ? `Immediate Priority: ${stats.lowestCoreDeckId.id}. Stabilize core concepts before engaging with high-complexity scenarios.`
+                    : `High performance baseline in ${stats.lowestCoreDeckId.id}. Strategy: Shift to rapid-fire mixed validation sessions.`}
+                </p>
+              </div>
           </div>
+
         </div>
       </div>
+      {/* --- GRID LAYOUT END --- */}
     </div>
   );
 };

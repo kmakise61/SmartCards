@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { adaptCards } from '../utils/adaptCards';
 import { useProgress } from '../context/ProgressContext';
 import { DECK_LIST, DECKS } from '../data/deck_config';
-import { PieChart, TrendingUp, AlertTriangle, CheckCircle2, Circle, Activity, Info } from 'lucide-react';
+import { SessionFilters } from '../types';
+import { PieChart, TrendingUp, AlertTriangle, CheckCircle2, Circle, Activity, Info, PlayCircle } from 'lucide-react';
 
 interface DeckStats {
   total: number;
@@ -12,7 +13,11 @@ interface DeckStats {
   label: string;
 }
 
-export const Analytics: React.FC = () => {
+interface AnalyticsProps {
+  onStartSession?: (filters: SessionFilters) => void;
+}
+
+export const Analytics: React.FC<AnalyticsProps> = ({ onStartSession }) => {
   const { progress, getCardMastery } = useProgress();
   const allCards = useMemo(() => adaptCards(), []);
 
@@ -63,7 +68,7 @@ export const Analytics: React.FC = () => {
       totalLearning, 
       totalCritical,
       deckBreakdown,
-      criticalCards: criticalCards.slice(0, 5) // Top 5 worst cards
+      criticalCards: criticalCards.slice(0, 10) // Show top 10
     };
   }, [allCards, progress, getCardMastery]);
 
@@ -181,28 +186,34 @@ export const Analytics: React.FC = () => {
               </div>
               <h3 className="text-lg font-black text-slate-800 dark:text-white">Trouble Spots</h3>
             </div>
-            <div className="group relative">
-               <Info size={16} className="text-slate-400 cursor-help" />
-               <div className="absolute right-0 top-6 w-48 bg-slate-800 text-white text-[10px] p-3 rounded-xl shadow-xl z-20 hidden group-hover:block leading-relaxed">
-                 Items rated <strong>"Again"</strong> more than 2 times. Review these concepts carefully.
-               </div>
-            </div>
+            {stats.criticalCards.length > 0 && onStartSession && (
+              <button 
+                onClick={() => onStartSession({ cardIds: stats.criticalCards.map(c => c.id) })}
+                className="text-[10px] font-black uppercase text-[var(--accent)] hover:underline flex items-center gap-1"
+              >
+                Review All <PlayCircle size={12} />
+              </button>
+            )}
           </div>
           
           {stats.criticalCards.length > 0 ? (
             <div className="space-y-4">
               {stats.criticalCards.map((card) => (
-                <div key={card.id} className="bg-white dark:bg-darkcard p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                <button 
+                  key={card.id} 
+                  onClick={() => onStartSession && onStartSession({ cardIds: [card.id] })}
+                  className="w-full text-left bg-white dark:bg-darkcard p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-500/50 transition-all group"
+                >
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{card.category}</span>
-                    <span className="text-[9px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2 py-0.5 rounded">
+                    <span className="text-[9px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2 py-0.5 rounded group-hover:bg-rose-100 transition-colors">
                       Failed {card.criticalCount}x
                     </span>
                   </div>
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300 line-clamp-2">
                     {card.question.replace(/\*\*/g, '')}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           ) : (

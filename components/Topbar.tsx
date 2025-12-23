@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ViewState } from '../types';
 import { Moon, Sun, Calendar, Settings, Menu } from 'lucide-react';
@@ -48,9 +47,9 @@ export const Topbar: React.FC<TopbarProps> = ({ currentView, theme, toggleTheme,
                 <Settings size={18} />
             </button>
 
-             <button className="hidden md:block w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden border-2 border-white dark:border-slate-600 shadow-sm relative group transition-transform active:scale-95">
-                <img src="https://picsum.photos/seed/nurse/200" alt="User Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-             </button>
+             <div className="hidden md:flex items-center justify-center h-10 px-5 bg-gradient-to-r from-slate-100 to-white dark:from-slate-800 dark:to-slate-800/50 border-2 border-white dark:border-slate-700 rounded-xl shadow-sm">
+                <span className="text-[10px] font-black text-[var(--accent)] uppercase tracking-[0.25em]">Future RN</span>
+             </div>
         </div>
       </div>
     </header>
