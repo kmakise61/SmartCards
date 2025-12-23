@@ -1,246 +1,350 @@
-// App.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import Dashboard from './components/Dashboard';
-import DeckGrid from './components/library/DeckGrid';
-import DeckBuilder from './components/library/DeckBuilder';
-import StudySession from './components/study/StudySession';
-import Browser from './components/library/Browser';
-import AnalyticsPage from './components/analytics/AnalyticsPage';
-import QuizModule from './components/quiz/QuizModule';
-import { RouteName, Deck, Flashcard } from './types';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { DataProvider } from './contexts/DataContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import AuthPage from './components/auth/AuthPage';
-import { BookOpen, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { Topbar } from './components/Topbar';
+import { Dashboard } from './pages/Dashboard';
+import { Flashcards } from './pages/Flashcards';
+import { Analytics } from './pages/Analytics';
+import { ViewState, AccentPreset, MasteryStatus, DeckId } from './types';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { ProgressProvider } from './context/ProgressContext';
+import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2 } from 'lucide-react';
+import { db } from './utils/db';
 
-const AppContent: React.FC = () => {
-  const { isDark, isCrescere } = useTheme();
-  const { currentUser, loading: authLoading } = useAuth();
-  
-  const [currentRoute, setCurrentRoute] = useState<RouteName>('Dashboard');
-  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+  const { settings, updateSettings } = useSettings();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  const [isStudying, setIsStudying] = useState(false);
-  const [studyMode, setStudyMode] = useState<'standard' | 'quick-fire' | 'drill'>('standard');
-  const [isBuildingDeck, setIsBuildingDeck] = useState(false);
-  const [editingDeckId, setEditingDeckId] = useState<string | undefined>(undefined);
-  const [activeDeckId, setActiveDeckId] = useState<string | undefined>(undefined);
-  const [drillCards, setDrillCards] = useState<Flashcard[]>([]); 
-  const [focusMode, setFocusMode] = useState(false);
+  const accentOptions: { id: AccentPreset; label: string; color: string }[] = [
+    { id: 'pink', label: 'Pink', color: '#F472B6' },
+    { id: 'rose', label: 'Rose', color: '#FB7185' },
+    { id: 'violet', label: 'Violet', color: '#A78BFA' },
+    { id: 'cyan', label: 'Cyan', color: '#22D3EE' },
+  ];
 
-  const [showManuals, setShowManuals] = useState(false);
-  const [isTabletOrBelow, setIsTabletOrBelow] = useState(false);
+  const handleExport = async () => {
+    try {
+      const json = await db.exportBackup();
+      const filename = `pnle_smartcards_backup_${new Date().toISOString().split('T')[0]}.json`;
+      const file = new File([json], filename, { type: 'application/json' });
+
+      // Use Native Share API if available (Mobile/Tablet)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'PNLE SmartCards Backup',
+            text: 'Here is my study progress backup.',
+          });
+          return;
+        } catch (shareError) {
+          // Fallback if user cancels share or error occurs
+          console.log('Share cancelled or failed, falling back to download');
+        }
+      }
+
+      // Fallback: Standard Download (Desktop)
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export failed", e);
+      alert("Failed to create backup.");
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      await db.importBackup(text);
+      setImportStatus('success');
+      setTimeout(() => {
+        window.location.reload(); // Reload to reflect changes in context
+      }, 1500);
+    } catch (e) {
+      console.error("Import failed", e);
+      setImportStatus('error');
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-xs md:max-w-sm bg-white dark:bg-darkcard h-full shadow-2xl flex flex-col animate-slide-in-right">
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">Settings</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <section>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Accent Color</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {accentOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  disabled={settings.softMode}
+                  onClick={() => updateSettings({ accent: opt.id })}
+                  className={`flex items-center space-x-3 p-3 rounded-2xl border-2 transition-all ${
+                    !settings.softMode && settings.accent === opt.id 
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)]' 
+                    : 'border-slate-100 dark:border-slate-800 hover:border-slate-200'
+                  } ${settings.softMode ? 'opacity-30 cursor-not-allowed' : ''}`}
+                >
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: opt.color }}>
+                    {!settings.softMode && settings.accent === opt.id && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-bold">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Study Preferences</h3>
+            
+            <label className="flex items-center justify-between p-1 cursor-pointer">
+              <span className="text-xs font-semibold">Soft Mode</span>
+              <div className="relative inline-flex items-center">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={settings.softMode} 
+                  onChange={(e) => updateSettings({ softMode: e.target.checked })}
+                />
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+              </div>
+            </label>
+
+            <label className="flex items-center justify-between p-1 cursor-pointer">
+              <span className="text-xs font-semibold">Auto-advance</span>
+              <div className="relative inline-flex items-center">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={settings.autoAdvance} 
+                  onChange={(e) => updateSettings({ autoAdvance: e.target.checked })}
+                />
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+              </div>
+            </label>
+
+            <label className="flex items-center justify-between p-1 cursor-pointer">
+              <span className="text-xs font-semibold">Keyboard hints</span>
+              <div className="relative inline-flex items-center">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={settings.showKeyboardHints} 
+                  onChange={(e) => updateSettings({ showKeyboardHints: e.target.checked })}
+                />
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+              </div>
+            </label>
+          </section>
+
+          <section className="pt-6 border-t border-slate-100 dark:border-slate-800">
+             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Data Management</h3>
+             <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleExport}
+                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all group"
+                >
+                   <div className="flex flex-col items-start">
+                      <span className="text-xs font-bold">Sync / Backup</span>
+                      <span className="text-[9px] text-slate-400">Share or Download JSON</span>
+                   </div>
+                   <div className="flex gap-2">
+                      <Share2 size={18} className="text-slate-300 group-hover:text-[var(--accent)] transition-colors" />
+                      <Download size={18} className="text-slate-300 group-hover:text-[var(--accent)] transition-colors" />
+                   </div>
+                </button>
+
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImport}
+                    className="hidden" 
+                    accept=".json"
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-500 transition-all group"
+                  >
+                    <div className="flex flex-col items-start">
+                        <span className="text-xs font-bold">Restore Data</span>
+                        <span className="text-[9px] text-slate-400">Import JSON backup</span>
+                    </div>
+                    <Upload size={18} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                </div>
+
+                {importStatus === 'success' && (
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-xl text-[10px] font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1">
+                    <Check size={14} /> Restore successful! Reloading...
+                  </div>
+                )}
+                {importStatus === 'error' && (
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-xl text-[10px] font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1">
+                    <AlertCircle size={14} /> Invalid file format.
+                  </div>
+                )}
+             </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MainContent: React.FC = () => {
+  const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [flashcardFilters, setFlashcardFilters] = useState<{ mastery?: MasteryStatus[], deckId?: DeckId, setId?: string } | undefined>(undefined);
+  const [isResuming, setIsResuming] = useState(false);
+  const [flashcardsKey, setFlashcardsKey] = useState(0);
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
-    const apply = () => setIsTabletOrBelow(mq.matches);
-    apply();
-    mq.addEventListener?.('change', apply);
-    return () => mq.removeEventListener?.('change', apply);
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark');
+    }
   }, []);
 
-  const sidebarOffsetClass = useMemo(() => {
-    if (focusMode) return '';
-    if (isTabletOrBelow) return 'lg:ml-0';
-    return isSidebarMinimized ? 'lg:ml-20' : 'lg:ml-64';
-  }, [focusMode, isTabletOrBelow, isSidebarMinimized]);
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
-  const getBackgroundClass = () => {
-    if (isCrescere) return 'bg-[#000000]';
-    if (isDark) return 'bg-[#0A0F1C]';
-    return 'bg-[#F8FAFC]';
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const handleDeckSelection = (deck: Deck) => {
-    setActiveDeckId(deck.id);
-    setStudyMode('standard');
-    setDrillCards([]);
-    setIsStudying(true);
+  const startSession = (filters?: { mastery?: MasteryStatus[], deckId?: DeckId, setId?: string }, resume = false) => {
+    setFlashcardFilters(filters);
+    setIsResuming(resume);
+    setCurrentView('flashcards');
+    setIsSidebarCollapsed(true);
+    setFlashcardsKey(prev => prev + 1);
   };
 
-  const handleCreateDeck = () => {
-    setEditingDeckId(undefined);
-    setIsBuildingDeck(true);
+  const handleViewChange = (view: ViewState) => {
+    // Clear sub-view state and force component remount via key
+    setFlashcardFilters(undefined);
+    setIsResuming(false);
+    setFlashcardsKey(prev => prev + 1);
+    
+    setCurrentView(view);
+    
+    // Always expand sidebar when navigating between main views to restore context
+    setIsSidebarCollapsed(false);
   };
 
-  const handleEditDeck = (deck: Deck) => {
-    setEditingDeckId(deck.id);
-    setIsBuildingDeck(true);
-  };
+  return (
+    <div className="h-screen flex flex-col md:flex-row bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden">
+      <Sidebar 
+        currentView={currentView} 
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onChangeView={handleViewChange} 
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
-  const handleStartSession = () => {
-    setActiveDeckId(undefined);
-    setStudyMode('standard');
-    setDrillCards([]);
-    setIsStudying(true);
-  };
-
-  const handleQuickFire = () => {
-    setActiveDeckId(undefined);
-    setStudyMode('quick-fire');
-    setDrillCards([]);
-    setIsStudying(true);
-  };
-
-  const handleStartDrill = (cards: Flashcard[]) => {
-      setDrillCards(cards);
-      setStudyMode('drill');
-      setActiveDeckId(undefined);
-      setIsStudying(true);
-  };
-
-  const renderContent = () => {
-    if (isStudying) {
-      return (
-        <StudySession
-          deckId={activeDeckId}
-          mode={studyMode}
-          drillCards={drillCards}
-          onExit={() => setIsStudying(false)}
-          toggleFocusMode={setFocusMode}
+      <div className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'}`}>
+        <Topbar 
+          currentView={currentView}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
-      );
-    }
 
-    if (isBuildingDeck) {
-      return <DeckBuilder deckId={editingDeckId} onClose={() => setIsBuildingDeck(false)} />;
-    }
-
-    switch (currentRoute) {
-      case 'Dashboard':
-        return (
-          <Dashboard
-            onStartSession={handleStartSession}
-            onQuickFire={handleQuickFire}
-            onBrowse={() => setCurrentRoute('My Decks')}
-            onOpenManuals={() => setShowManuals(true)}
-            onViewAnalytics={() => setCurrentRoute('Analytics')}
-          />
-        );
-      case 'My Decks':
-        return (
-          <div className="space-y-6">
-            <DeckGrid onSelectDeck={handleDeckSelection} onCreateDeck={handleCreateDeck} onEditDeck={handleEditDeck} />
-            <div className="border-t border-slate-500/10 pt-6">
-              <Browser />
+        <main className="flex-1 min-h-0 overflow-hidden relative">
+          {currentView === 'dashboard' ? (
+            <div className="h-full overflow-y-auto">
+              <Dashboard onStartSession={startSession} />
             </div>
-          </div>
-        );
-      case 'Quizzes':
-        return <QuizModule />;
-      case 'Analytics':
-        return <AnalyticsPage onStartDrill={handleStartDrill} />;
-      default:
-        return null;
-    }
-  };
-
-  // Auth Loading State
-  if (authLoading) {
-      return (
-          <div className={`h-screen w-full flex items-center justify-center ${getBackgroundClass()}`}>
-              <Loader2 className="w-10 h-10 text-accent animate-spin" />
-          </div>
-      );
-  }
-
-  // Not Logged In
-  if (!currentUser) {
-      return <AuthPage />;
-  }
-
-  // Authenticated App
-  return (
-    <DataProvider uid={currentUser.uid}>
-        <div className={`h-screen w-full overflow-hidden transition-colors duration-500 ease-in-out font-sans ${getBackgroundClass()}`}>
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-            <div
-            className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${
-                isCrescere ? 'from-zinc-900/20 to-black' : isDark ? 'from-indigo-900/10 to-transparent' : 'from-rose-50/50 to-transparent'
-            }`}
+          ) : currentView === 'analytics' ? (
+            <div className="h-full overflow-y-auto">
+              <Analytics />
+            </div>
+          ) : (
+            <Flashcards 
+              key={flashcardsKey}
+              initialFilters={flashcardFilters} 
+              isFocusMode={isSidebarCollapsed} 
+              onToggleFocus={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              onResumeSession={isResuming}
+              onExit={() => handleViewChange('dashboard')}
             />
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-10 bg-accent animate-blob" />
-        </div>
+          )}
+        </main>
+      </div>
 
-        <div className="flex">
-            {!focusMode && (
-            <Sidebar
-                currentRoute={currentRoute}
-                onNavigate={(route) => {
-                setCurrentRoute(route);
-                setIsStudying(false);
-                setIsBuildingDeck(false);
-                }}
-                isMinimized={isSidebarMinimized}
-                toggleMinimize={() => setIsSidebarMinimized(!isSidebarMinimized)}
-                isMobileOpen={isMobileMenuOpen}
-                closeMobileMenu={() => setIsMobileMenuOpen(false)}
-            />
-            )}
+      {/* Mobile Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-darkcard/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 md:hidden flex items-center justify-around z-[110] px-6 shadow-lg">
+          <button 
+            onClick={() => handleViewChange('dashboard')}
+            className={`flex flex-col items-center gap-1 transition-all ${currentView === 'dashboard' ? 'text-[var(--accent)] scale-110' : 'text-slate-400'}`}
+          >
+            <LayoutDashboard size={20} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Dash</span>
+          </button>
+          <button 
+            onClick={() => handleViewChange('flashcards')}
+            className={`flex flex-col items-center gap-1 transition-all ${currentView === 'flashcards' ? 'text-[var(--accent)] scale-110' : 'text-slate-400'}`}
+          >
+            <WalletCards size={20} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Cards</span>
+          </button>
+          <button 
+            onClick={() => handleViewChange('analytics')}
+            className={`flex flex-col items-center gap-1 transition-all ${currentView === 'analytics' ? 'text-[var(--accent)] scale-110' : 'text-slate-400'}`}
+          >
+            <BarChart2 size={20} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Stats</span>
+          </button>
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex flex-col items-center gap-1 text-slate-400"
+          >
+            <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700">
+               <img src="https://picsum.photos/seed/nurse/50" alt="Profile" className="w-full h-full object-cover" />
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest">Me</span>
+          </button>
+      </nav>
 
-            <div className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out ${sidebarOffsetClass}`}>
-            <div className={`transition-all duration-300 flex-none ${focusMode ? '-translate-y-16' : 'translate-y-0'}`}>
-                <TopBar 
-                    currentRoute={currentRoute} 
-                    openMobileMenu={() => setIsMobileMenuOpen(true)}
-                    user={{
-                        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Nurse',
-                        email: currentUser.email || '',
-                        title: 'RN Candidate',
-                        avatarUrl: currentUser.photoURL || ''
-                    }}
-                />
-            </div>
-
-            <main className={`flex-1 overflow-y-auto custom-scrollbar ${isStudying ? '' : 'p-4 md:p-6 lg:p-8'}`}>
-                <div className="w-full">{renderContent()}</div>
-            </main>
-            </div>
-        </div>
-
-        {showManuals && (
-            <div className="fixed inset-0 z-[1050] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-            <div className={`w-full max-w-lg p-8 rounded-xl shadow-2xl relative ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'}`}>
-                <button onClick={() => setShowManuals(false)} className="absolute top-4 right-4 p-2 opacity-40 hover:opacity-100 transition-opacity">
-                <X size={20} className={isDark ? 'text-white' : 'text-slate-900'} />
-                </button>
-                <div className="flex flex-col items-center text-center gap-5">
-                <div className="p-4 rounded-xl bg-accent/10 text-accent">
-                    <BookOpen size={40} />
-                </div>
-                <div className="space-y-1">
-                    <h2 className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Study Manuals</h2>
-                    <p className={`text-sm opacity-60 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Digitized PDF reviewers for PNLE modules are currently in development. A download link will appear here soon.
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowManuals(false)}
-                    className="w-full py-3 rounded-lg bg-accent text-white font-bold text-sm uppercase tracking-widest mt-2 hover:brightness-110 active:scale-95 transition-all"
-                >
-                    Understood
-                </button>
-                </div>
-            </div>
-            </div>
-        )}
-        </div>
-    </DataProvider>
+      <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+    </div>
   );
 };
 
-const App: React.FC = () => {
+function App() {
   return (
-    <ThemeProvider>
-        <AuthProvider>
-            <AppContent />
-        </AuthProvider>
-    </ThemeProvider>
+    <ProgressProvider>
+      <SettingsProvider>
+        <MainContent />
+      </SettingsProvider>
+    </ProgressProvider>
   );
-};
+}
 
 export default App;

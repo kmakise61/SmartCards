@@ -1,139 +1,94 @@
-import { LucideIcon } from "lucide-react";
-
-export type ThemeMode = 'light' | 'dark' | 'midnight';
-
-export type AccentColor = 'rose' | 'blue' | 'gold' | 'emerald' | 'violet';
-
-export type RouteName = 
-  | 'Dashboard' 
-  | 'My Decks' 
-  | 'Quizzes' 
-  | 'Analytics';
-
-export interface NavigationItem {
-  name: RouteName;
-  icon: LucideIcon;
-  path: string;
-}
-
-export interface UserProfile {
-  name: string;
-  avatarUrl: string;
-  title: string;
-  email: string;
-}
-
-export interface DailyActivity {
-  date: string; // ISO Date String (YYYY-MM-DD)
-  count: number;
-}
-
-export interface StudyStats {
-  cardsDue: number;
-  retentionRate: number;
-  streakDays: number;
-  cardsLearned: number;
-  totalStudyTimemins: number;
-  lastStudyDate: string | null; // ISO Date string
-  activityHistory: DailyActivity[]; 
-  // Tracking for daily limits
-  dailyProgress?: {
-    date: string;
-    newStudied: number;
-    reviewStudied: number;
-  };
-}
-
-export type CardRating = 'again' | 'hard' | 'good' | 'easy';
-
-export interface ReviewLog {
-  timestamp: number;
-  rating: CardRating;
-}
-
-export type SchedulingEngine = 'smartcards' | 'sm2' | 'fsrs' | 'leitner';
-
-export interface StudyPreferences {
-  schedulingEngine: SchedulingEngine;
-  
-  // Session Limits
-  questionsPerDay: number; // Global cap (legacy support)
-  newCardsPerDay: number;
-  reviewCardsPerDay: number;
-  sessionSize: number;
-
-  // FSRS Specifics
-  targetRetention: number; // 0.75 - 0.95
-  enableFuzz: boolean;
-
-  // PNLE Specifics
-  highYieldMode: boolean; // Prioritize high-yield tags
-  examCountdownIntensity: number; // 0-100 slider (Interval scaling)
-
-  // Legacy/Other Engines
-  easyBonusDays: number; 
-}
-
-export interface DashboardConfig {
-  title: string;
-  subtitle: string;
-  lastUpdated: number;
-}
 
 export interface Flashcard {
   id: string;
   deckId: string;
+  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+  setId: string;
+  setName: string;
+  setDescription: string;
+  setTags?: string[];
   front: string;
   back: string;
+  tags: string[];
   hint?: string;
-  tags: string[];
-  lastReviewed?: string; // ISO Date string
-  nextReview?: string; // ISO Date string
-  interval: number; // Days (float)
+  status: string;
+  interval: number;
   easeFactor: number;
-  status: 'new' | 'learning' | 'review' | 'relearning';
-  
-  // Enhanced Features
-  isFavorite?: boolean;
-  reviewHistory?: ReviewLog[]; // Compact history
-  struggleScore?: number; // Computed score (0-100)
-
-  // Scheduling Metadata
-  learningStepIndex?: number;
-  previousIntervalDays?: number; // For relearning
-  leitnerBox?: number; // 1-5
-  fsrs?: {
-    stability: number;
-    difficulty: number;
-    elapsedDays: number;
-    scheduledDays: number;
-    retrievability: number;
-  };
 }
 
-export interface Deck {
-  id: string;
+export type MasteryStatus = 'unseen' | 'learning' | 'mastered';
+export type GradeStatus = 'again' | 'hard' | 'good';
+
+export interface FlashcardUI extends Flashcard {
+  displayId: string;
+  category: string;
+  question: string;
+  answer: string;
+  rationale: string;
+  // Progress Data
+  masteryStatus: MasteryStatus;
+  goodCount: number;
+  stableCount: number;
+  criticalCount: number;
+  seen: boolean;
+  lastGrade: GradeStatus | null;
+}
+
+export type ViewState = 'dashboard' | 'flashcards' | 'analytics';
+export type FlashcardsViewMode = 'decks' | 'sets' | 'details' | 'study';
+export type AccentPreset = 'pink' | 'rose' | 'violet' | 'cyan';
+
+export interface UserSettings {
+  accent: AccentPreset;
+  softMode: boolean;
+  sortByLowest: boolean;
+  autoAdvance: boolean;
+  showKeyboardHints: boolean;
+  showCardNumbers: boolean;
+  autoResume: boolean;
+}
+
+export type SessionGoal = 10 | 25 | 50 | 'unlimited';
+
+export interface MasteryRecord {
+  seen: boolean;
+  goodCount: number;
+  criticalCount: number;
+  lastGrade: GradeStatus | null;
+  updatedAt: number;
+}
+
+export interface DeckIdStats {
+  total: number;
+  unseen: number;
+  learning: number;
+  mastered: number;
+  progress: number;
+}
+
+export type DeckId = "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+
+export interface DeckConfig {
+  id: DeckId;
   title: string;
+  subtitle: string;
   description: string;
-  cardCount: number;
-  tags: string[];
-  color: string; // Tailwind class
-  lastStudied?: string; // ISO Date string
+  isSupplemental?: boolean;
 }
 
-// --- NEW QUIZ TYPES ---
-export interface QuizQuestion {
-  id: string;
-  text: string;
-  options: string[];
-  correctOptionIndex: number;
-  explanation: string;
+export interface SetMetadata {
+  setId: string;
+  setName: string;
+  setDescription: string;
+  setTags: string[];
+  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+  totalCards: number;
 }
 
-export interface Quiz {
-  id: string;
-  title: string;
-  description: string;
-  questions: QuizQuestion[];
-  bestScore?: number;
+export interface LastSessionState {
+  deckId: DeckId | null;
+  setId: string | null;
+  currentIndex: number;
+  masteryFilters: MasteryStatus[];
+  timestamp: number;
 }
