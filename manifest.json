@@ -1,0 +1,16 @@
+{
+  "name": "PNLE SmartCards",
+  "short_name": "PNLE Cards",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fdf2f8",
+  "theme_color": "#ec4899",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
