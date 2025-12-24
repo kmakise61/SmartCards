@@ -1,28 +1,33 @@
-const CACHE_NAME = 'pnle-smartcards-v1';
+const CACHE_NAME = 'pnle-smartcards-v3';
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './icon.svg',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'
+  '/',
+  '/index.html',
+  '/icon.svg',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      // Using allSettled to ensure service worker installs even if one asset fails
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map(url => cache.add(url))
+      );
     })
   );
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
     caches.match(event.request).then((response) => {
-      // Cache hit - return response
       if (response) {
         return response;
       }
-      return fetch(event.request);
+      return fetch(event.request).catch(() => {
+        // Just let the network request fail normally if not in cache
+      });
     })
   );
 });
