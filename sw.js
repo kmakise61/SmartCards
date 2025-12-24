@@ -1,6 +1,7 @@
-const CACHE_NAME = 'pnle-smartcards-v18'; // Version Bumped
+const CACHE_NAME = 'pnle-smartcards-v20'; // Version Bumped
 
-// CRITICAL: These MUST exist for the app to load.
+// 1. CRITICAL: The App Shell (Must exist or app is useless)
+// If any of these fail, the app WILL NOT work offline.
 const CRITICAL_ASSETS = [
   '/',
   '/index.html',
@@ -11,7 +12,7 @@ const CRITICAL_ASSETS = [
   'https://esm.sh/lucide-react@0.469.0?external=react'
 ];
 
-// OPTIONAL: If these fail, we continue anyway.
+// 2. OPTIONAL: Nice to have, but don't crash if missing
 const OPTIONAL_ASSETS = [
   '/manifest.json',
   '/icon.svg',
@@ -19,21 +20,29 @@ const OPTIONAL_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Force activation
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log('SW: Installing...');
       
-      // 1. Install Critical Assets (Fail if these are missing)
-      await cache.addAll(CRITICAL_ASSETS);
-      
-      // 2. Try to install Optional Assets (Ignore errors)
-      // This prevents the "IP Server Not Found" error if you forgot the icon.
+      // Install Critical Assets
+      try {
+        await cache.addAll(CRITICAL_ASSETS);
+      } catch (e) {
+        console.error('SW: Critical asset failed', e);
+      }
+
+      // Install Optional Assets (One by one, ignoring errors)
       for (const url of OPTIONAL_ASSETS) {
         try {
-          await cache.add(url);
-        } catch (err) {
-          console.warn('SW: Failed to cache optional asset:', url);
+          const res = await fetch(url);
+          if (res.ok) {
+            await cache.put(url, res);
+          } else {
+            console.warn(`SW: Failed to fetch ${url} (Status: ${res.status})`);
+          }
+        } catch (e) {
+          console.warn(`SW: Could not cache ${url}`, e);
         }
       }
     })
@@ -52,30 +61,23 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // 1. Navigation (HTML): Network First -> Cache Fallback
+  // Navigation: Network First -> Cache Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .catch(() => {
-          // If offline, return index.html
-          return caches.match('/index.html');
-        })
+      fetch(event.request).catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // 2. External Libs: Cache First
-  if (
-    url.origin.includes('esm.sh') || 
-    url.origin.includes('tailwindcss.com')
-  ) {
+  // External Libs: Cache First
+  const url = new URL(event.request.url);
+  if (url.origin.includes('esm.sh') || url.origin.includes('tailwindcss.com')) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
-        return cached || fetch(event.request).then((res) => {
+        return cached || fetch(event.request).then(res => {
           if (res.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
           }
           return res;
         });
@@ -84,16 +86,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Default: Stale-While-Revalidate
+  // Default: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request).then((res) => {
         if (res.ok) {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, res.clone()));
         }
         return res;
       }).catch(() => null);
-      
       return cached || fetchPromise;
     })
   );
