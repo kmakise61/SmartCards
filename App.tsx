@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -8,7 +7,7 @@ import { Analytics } from './pages/Analytics';
 import { ViewState, SessionFilters } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider, useProgress } from './context/ProgressContext';
-import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool } from 'lucide-react';
+import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool, SmartphoneIcon as DownloadIcon } from 'lucide-react';
 import { db } from './utils/db';
 import { CustomSessionModal } from './components/CustomSessionModal';
 import { GlobalSearch } from './components/GlobalSearch';
@@ -132,8 +131,19 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [isSyncHelpOpen, setIsSyncHelpOpen] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
 
   const editCount = Object.keys(cardEdits).length;
+
+  useEffect(() => {
+    const checkInstallability = () => {
+      setCanInstall(!!(window as any).deferredPrompt);
+    };
+
+    checkInstallability();
+    window.addEventListener('pwa-install-available', checkInstallability);
+    return () => window.removeEventListener('pwa-install-available', checkInstallability);
+  }, []);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -146,6 +156,16 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
+
+  const handleInstallApp = async () => {
+    const promptEvent = (window as any).deferredPrompt;
+    if (!promptEvent) return;
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+    (window as any).deferredPrompt = null;
+    setCanInstall(false);
+  };
 
   const handleTestSpeech = () => {
     if ('speechSynthesis' in window) {
@@ -251,6 +271,30 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
 
           <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-10 no-scrollbar">
             
+            {/* PWA Install Section */}
+            {canInstall && (
+              <section className="bg-gradient-to-br from-[var(--accent)] to-indigo-600 p-6 rounded-3xl shadow-lg text-white">
+                <h3 className="text-xs font-black uppercase tracking-widest mb-4 opacity-90">App Installation</h3>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                    <DownloadIcon size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm leading-tight">Install Offline App</h4>
+                    <p className="text-[10px] font-medium opacity-80 mt-1 leading-relaxed">
+                      Launch PNLE SmartCards directly from your home screen and use it anytime.
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleInstallApp}
+                  className="w-full py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase tracking-widest shadow-sm hover:scale-105 active:scale-95 transition-all"
+                >
+                  Install Now
+                </button>
+              </section>
+            )}
+
             {/* Appearance Section */}
             <section>
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Appearance</h3>

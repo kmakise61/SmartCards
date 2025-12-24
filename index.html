@@ -138,6 +138,23 @@
   <body class="bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
     <script>
+      // Global PWA prompt state
+      window.deferredPrompt = null;
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        window.deferredPrompt = e;
+        // Update UI notify listener in React components
+        window.dispatchEvent(new CustomEvent('pwa-install-available'));
+      });
+
+      window.addEventListener('appinstalled', (event) => {
+        window.deferredPrompt = null;
+        console.log('PNLE SmartCards was installed.');
+      });
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js')
