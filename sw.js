@@ -1,10 +1,9 @@
-const CACHE_NAME = 'pnle-smartcards-v17'; // Version bumped
+const CACHE_NAME = 'pnle-smartcards-v18'; // Version Bumped
 
-const PRECACHE_ASSETS = [
+// CRITICAL: These MUST exist for the app to load.
+const CRITICAL_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/icon.svg', // MAKE SURE THIS FILE EXISTS!
   'https://cdn.tailwindcss.com',
   'https://esm.sh/react@19.0.0',
   'https://esm.sh/react-dom@19.0.0',
@@ -12,12 +11,31 @@ const PRECACHE_ASSETS = [
   'https://esm.sh/lucide-react@0.469.0?external=react'
 ];
 
+// OPTIONAL: If these fail, we continue anyway.
+const OPTIONAL_ASSETS = [
+  '/manifest.json',
+  '/icon.svg',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'
+];
+
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Activate immediately
+  self.skipWaiting(); // Force activation
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: Pre-caching files...');
-      return cache.addAll(PRECACHE_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('SW: Installing...');
+      
+      // 1. Install Critical Assets (Fail if these are missing)
+      await cache.addAll(CRITICAL_ASSETS);
+      
+      // 2. Try to install Optional Assets (Ignore errors)
+      // This prevents the "IP Server Not Found" error if you forgot the icon.
+      for (const url of OPTIONAL_ASSETS) {
+        try {
+          await cache.add(url);
+        } catch (err) {
+          console.warn('SW: Failed to cache optional asset:', url);
+        }
+      }
     })
   );
 });
@@ -30,28 +48,25 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim(); // Take control of the page immediately
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. Navigation (HTML): NETWORK FIRST, THEN CACHE
-  // This fixes the "Unreachable" error. It tries the internet. 
-  // If internet fails, it gives you the cached index.html.
+  // 1. Navigation (HTML): Network First -> Cache Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          // If offline, return the cached index.html
-          // regardless of what URL the user asked for (e.g. /?source=pwa)
+          // If offline, return index.html
           return caches.match('/index.html');
         })
     );
     return;
   }
 
-  // 2. External Assets (React, Tailwind): CACHE FIRST
+  // 2. External Libs: Cache First
   if (
     url.origin.includes('esm.sh') || 
     url.origin.includes('tailwindcss.com')
@@ -59,8 +74,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         return cached || fetch(event.request).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          if (res.ok) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
+          }
           return res;
         });
       })
@@ -68,7 +84,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Everything else: Stale-While-Revalidate
+  // 3. Default: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request).then((res) => {
@@ -76,7 +92,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
         }
         return res;
-      }).catch(() => null); // Eat errors if offline
+      }).catch(() => null);
       
       return cached || fetchPromise;
     })
