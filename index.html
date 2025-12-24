@@ -10,12 +10,16 @@
     
     <title>PNLE SmartCards</title>
     
-    <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://esm.sh/react@19.0.0"></script>
+    <script src="https://esm.sh/react-dom@19.0.0"></script>
+    <script src="https://esm.sh/react-dom@19.0.0/client"></script>
+    <script src="https://esm.sh/lucide-react@0.469.0?external=react"></script>
+
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -43,6 +47,10 @@
             boxShadow: {
               'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
               'glow': '0 0 25px rgba(244, 114, 182, 0.2)',
+            },
+            // Safe area for iPhone Notch
+            padding: {
+              'safe': 'env(safe-area-inset-bottom)',
             }
           },
         },
@@ -93,6 +101,11 @@
         will-change: transform;
       }
 
+      /* Safe area padding for bottom navigation on iPhone */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
       /* Ultra-Minimalist Scrollbar */
       ::-webkit-scrollbar {
         width: 5px;
@@ -123,23 +136,22 @@
       }
     </style>
   <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.469.0?external=react",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
+  {
+    "imports": {
+      "react": "https://esm.sh/react@19.0.0",
+      "react-dom": "https://esm.sh/react-dom@19.0.0",
+      "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+      "lucide-react": "https://esm.sh/lucide-react@0.469.0?external=react",
+      "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+      "react/": "https://esm.sh/react@^19.2.3/"
+    }
   }
-}
-</script>
+  </script>
 <link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
     
-    <!-- Entry script for the React Application -->
     <script type="module" src="./index.tsx"></script>
 
     <script>

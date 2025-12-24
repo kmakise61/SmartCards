@@ -7,10 +7,11 @@ import { Analytics } from './pages/Analytics';
 import { ViewState, SessionFilters } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider, useProgress } from './context/ProgressContext';
-import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool, SmartphoneIcon as DownloadIcon } from 'lucide-react';
+import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool, SmartphoneIcon as DownloadIcon, WifiOff } from 'lucide-react';
 import { db } from './utils/db';
 import { CustomSessionModal } from './components/CustomSessionModal';
 import { GlobalSearch } from './components/GlobalSearch';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 
 const ResetConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void }> = ({ isOpen, onClose, onConfirm }) => {
   const [input, setInput] = useState('');
@@ -525,6 +526,9 @@ const MainContent: React.FC = () => {
   const [flashcardFilters, setFlashcardFilters] = useState<SessionFilters | undefined>(undefined);
   const [isResuming, setIsResuming] = useState(false);
   const [flashcardsKey, setFlashcardsKey] = useState(0);
+  
+  // Use the hook to check connection
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -585,7 +589,16 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden">
+    <div className="h-screen flex flex-col md:flex-row bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden relative">
+      
+      {/* OFFLINE INDICATOR */}
+      {!isOnline && (
+        <div className="absolute top-0 left-0 right-0 z-[150] bg-slate-800 text-white/90 text-[10px] font-bold uppercase tracking-widest text-center py-1.5 shadow-lg flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300">
+          <WifiOff size={12} className="text-rose-400" />
+          <span>Offline Mode</span>
+        </div>
+      )}
+
       <Sidebar 
         currentView={currentView} 
         isCollapsed={isSidebarCollapsed}
@@ -630,7 +643,7 @@ const MainContent: React.FC = () => {
       </div>
 
       {/* Mobile Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-darkcard/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 md:hidden flex items-center justify-around z-[110] px-6 shadow-lg">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-darkcard/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 md:hidden flex items-center justify-around z-[110] px-6 shadow-lg pb-safe">
           <button 
             onClick={() => handleViewChange('dashboard')}
             className={`flex flex-col items-center gap-1 transition-all ${currentView === 'dashboard' ? 'text-[var(--accent)] scale-110' : 'text-slate-400'}`}
