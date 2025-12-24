@@ -59,7 +59,7 @@
 
       body {
         font-family: 'Inter', sans-serif;
-        overscroll-behavior-y: contain; /* Prevents pull-to-refresh on mobile */
+        overscroll-behavior-y: contain;
       }
 
       /* Fixed Viewport Heights */
@@ -104,39 +104,43 @@
       }
 
       ::-webkit-scrollbar-thumb {
-        background: rgba(203, 213, 225, 0.4); /* slate-300 with opacity */
+        background: rgba(203, 213, 225, 0.4);
         border-radius: 10px;
         transition: background 0.2s ease;
       }
 
       ::-webkit-scrollbar-thumb:hover {
-        background: rgba(148, 163, 184, 0.8); /* slate-400 */
+        background: rgba(148, 163, 184, 0.8);
       }
 
       /* Dark mode scrollbar override */
       .dark ::-webkit-scrollbar-thumb {
-        background: rgba(51, 65, 85, 0.4); /* slate-700 with opacity */
+        background: rgba(51, 65, 85, 0.4);
       }
 
       .dark ::-webkit-scrollbar-thumb:hover {
-        background: rgba(71, 85, 105, 0.8); /* slate-600 */
+        background: rgba(71, 85, 105, 0.8);
       }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.469.0?external=react",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
+    
+    <!-- Entry script for the React Application -->
+    <script type="module" src="./index.tsx"></script>
+
     <script>
       // Global PWA prompt state
       window.deferredPrompt = null;
@@ -167,6 +171,5 @@
         });
       }
     </script>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>
