@@ -11,9 +11,9 @@
     <title>PNLE SmartCards</title>
     
     <!-- PWA -->
-    <link rel="manifest" href="manifest.json" />
-    <link rel="icon" type="image/svg+xml" href="icon.svg" />
-    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -161,7 +161,7 @@
         window.addEventListener('load', () => {
           // Use a slight delay to ensure first paint is stable
           setTimeout(() => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' })
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
               .then(registration => {
                 console.log('SW registered: ', registration);
               })
