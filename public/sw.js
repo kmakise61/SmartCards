@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pnle-smartcards-v22'; // I bumped the version for you
+const CACHE_NAME = 'pnle-smartcards-v23'; // Version Bumped for Route Fix
 
 // List of files to cache
 const ASSETS_TO_CACHE = [

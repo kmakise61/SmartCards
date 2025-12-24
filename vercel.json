@@ -25,7 +25,19 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!sw\\.js|manifest\\.json|icon\\.svg).*)",
+      "source": "/sw.js",
+      "destination": "/public/sw.js"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/public/manifest.json"
+    },
+    {
+      "source": "/icon.svg",
+      "destination": "/public/icon.svg"
+    },
+    {
+      "source": "/((?!public/).*)",
       "destination": "/index.html"
     }
   ]
