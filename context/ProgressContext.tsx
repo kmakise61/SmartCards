@@ -1,12 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { MasteryRecord, GradeStatus, MasteryStatus, LastSessionState, DeckId } from '../types';
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { MasteryRecord, GradeStatus, MasteryStatus, LastSessionState, DeckId, CardEdit, FlashcardUI } from '../types';
 import { db } from '../utils/db';
+import { adaptCards } from '../utils/adaptCards';
 
 interface ProgressContextType {
+  allCards: FlashcardUI[]; // Merged source of truth
   progress: Record<string, MasteryRecord>;
   lastSession: LastSessionState | null;
+  cardEdits: Record<string, CardEdit>;
   applyGrade: (cardId: string, grade: GradeStatus) => void;
   toggleFlag: (cardId: string) => void;
+  saveCardEdit: (edit: CardEdit) => void;
+  deleteCardEdit: (cardId: string) => void;
   setLastActive: (deckId: DeckId | null, setId: string | null, currentIndex?: number, masteryFilters?: MasteryStatus[]) => void;
   getStats: (cardIds: string[]) => { total: number; unseen: number; learning: number; mastered: number };
   getCardMastery: (seen: boolean, goodCount: number) => MasteryStatus;
@@ -16,6 +22,7 @@ const ProgressContext = createContext<ProgressContextType | undefined>(undefined
 
 export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [progress, setProgress] = useState<Record<string, MasteryRecord>>({});
+  const [cardEdits, setCardEdits] = useState<Record<string, CardEdit>>({});
   const [lastSession, setLastSession] = useState<LastSessionState | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -23,13 +30,15 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const init = async () => {
       try {
-        const [loadedProgress, loadedSession] = await Promise.all([
+        const [loadedProgress, loadedSession, loadedEdits] = await Promise.all([
           db.loadAllProgress(),
-          db.loadSession()
+          db.loadSession(),
+          db.loadCardEdits()
         ]);
         
         setProgress(loadedProgress);
         setLastSession(loadedSession);
+        setCardEdits(loadedEdits);
       } catch (e) {
         console.error("Failed to load data from IndexedDB", e);
       } finally {
@@ -38,6 +47,23 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     init();
   }, []);
+
+  // Compute merged cards whenever edits or static data changes (static data is constant, so mostly on edits change)
+  const allCards = useMemo(() => {
+    const staticCards = adaptCards();
+    return staticCards.map(card => {
+      const edit = cardEdits[card.id];
+      if (edit) {
+        return {
+          ...card,
+          question: edit.question,
+          answer: edit.answer,
+          rationale: edit.rationale
+        };
+      }
+      return card;
+    });
+  }, [cardEdits]);
 
   const getCardMastery = useCallback((seen: boolean, goodCount: number): MasteryStatus => {
     if (!seen) return 'unseen';
@@ -90,6 +116,20 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, []);
 
+  const saveCardEdit = useCallback((edit: CardEdit) => {
+    setCardEdits(prev => ({ ...prev, [edit.id]: edit }));
+    db.saveCardEdit(edit).catch(e => console.error("Failed to save edit", e));
+  }, []);
+
+  const deleteCardEdit = useCallback((cardId: string) => {
+    setCardEdits(prev => {
+      const newState = { ...prev };
+      delete newState[cardId];
+      return newState;
+    });
+    db.deleteCardEdit(cardId).catch(e => console.error("Failed to delete edit", e));
+  }, []);
+
   const setLastActive = useCallback((deckId: DeckId | null, setId: string | null, currentIndex: number = 0, masteryFilters: MasteryStatus[] = []) => {
     const newSession: LastSessionState = { deckId, setId, currentIndex, masteryFilters, timestamp: Date.now() };
     setLastSession(newSession);
@@ -109,7 +149,19 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   if (!loaded) return null; // Or a loading spinner
 
   return (
-    <ProgressContext.Provider value={{ progress, lastSession, applyGrade, toggleFlag, setLastActive, getStats, getCardMastery }}>
+    <ProgressContext.Provider value={{ 
+      allCards, // Exposed for app-wide use
+      progress, 
+      lastSession, 
+      cardEdits,
+      applyGrade, 
+      toggleFlag, 
+      saveCardEdit,
+      deleteCardEdit,
+      setLastActive, 
+      getStats, 
+      getCardMastery 
+    }}>
       {children}
     </ProgressContext.Provider>
   );

@@ -1,5 +1,5 @@
+
 import React, { useMemo } from 'react';
-import { adaptCards } from '../utils/adaptCards';
 import { useProgress } from '../context/ProgressContext';
 import { DECK_LIST, DECKS } from '../data/deck_config';
 import { SessionFilters } from '../types';
@@ -18,8 +18,7 @@ interface AnalyticsProps {
 }
 
 export const Analytics: React.FC<AnalyticsProps> = ({ onStartSession }) => {
-  const { progress, getCardMastery } = useProgress();
-  const allCards = useMemo(() => adaptCards(), []);
+  const { allCards, progress, getCardMastery } = useProgress();
 
   const stats = useMemo(() => {
     let totalSeen = 0;

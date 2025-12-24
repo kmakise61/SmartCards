@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ViewState } from '../types';
 import { LayoutDashboard, WalletCards, Settings, HeartPulse, ChevronRight, ChevronLeft, BarChart2 } from 'lucide-react';
@@ -14,7 +15,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentView, 
   onChangeView, 
   onOpenSettings, 
-  isCollapsed,
+  isCollapsed, 
   onToggleCollapse 
 }) => {
   const navItems = [

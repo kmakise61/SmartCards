@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { SetMetadata } from '../types';
-import { PlayCircle, ShieldCheck, AlertCircle, Eye, ChevronRight } from 'lucide-react';
+import { PlayCircle, ShieldCheck, AlertCircle, Eye, ChevronRight, CheckCircle2, Zap } from 'lucide-react';
 
 interface SetCardProps {
   set: SetMetadata;
@@ -12,91 +13,145 @@ interface SetCardProps {
     criticalCount?: number;
   };
   onStart: (setId: string) => void;
+  layout?: 'grid' | 'list';
 }
 
-export const SetCard: React.FC<SetCardProps> = ({ set, stats, onStart }) => {
+export const SetCard: React.FC<SetCardProps> = ({ set, stats, onStart, layout = 'grid' }) => {
   const progress = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
   const isMastered = progress === 100;
-  // High stakes logic: lots of learning cards but low mastery
   const isHighStakes = stats.learning > (stats.total * 0.4) && progress < 40;
 
-  return (
-    <div className={`group relative flex flex-col h-full rounded-3xl transition-all duration-300 hover:-translate-y-1 overflow-hidden
-      backdrop-blur-xl bg-white/70 dark:bg-slate-900/60
-      ${isMastered 
-        ? 'border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' 
-        : isHighStakes 
-          ? 'border border-rose-400/40 shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
-          : 'border border-white/40 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:border-[var(--accent)]/50 hover:shadow-[0_20px_40px_-10px_rgba(var(--accent-glow),0.4)]'
-      }`}
-    >
-      {/* Background Accent Gradient on Hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-soft)]/0 to-[var(--accent-soft)]/0 group-hover:from-[var(--accent-soft)]/10 group-hover:to-transparent transition-all duration-500 pointer-events-none" />
+  // --- LIST LAYOUT (Desktop Optimized) ---
+  if (layout === 'list') {
+    return (
+      <div className="group relative flex flex-col md:flex-row items-stretch md:items-center rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5
+        bg-white/80 dark:bg-slate-900/80 backdrop-blur-md 
+        border border-slate-200/60 dark:border-slate-800 
+        hover:border-[var(--accent)]/30 hover:shadow-xl hover:shadow-[var(--accent-glow)]
+        p-4 gap-6 md:h-24
+      ">
+        {/* Progress Bar (Vertical on left) */}
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-slate-100 dark:bg-slate-800">
+           <div 
+             className={`w-full transition-all duration-1000 ease-out ${isMastered ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} 
+             style={{ height: `${progress}%` }} 
+           />
+        </div>
 
-      {/* Top Section */}
-      <div className="p-6 flex flex-col flex-grow relative z-10 space-y-4">
-        
-        {/* Badge Row */}
-        <div className="flex items-center justify-between">
-           <span className={`font-mono text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider border transition-colors backdrop-blur-sm
-             ${isMastered ? 'bg-emerald-50/50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100/50 dark:border-emerald-900/30' : 'bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 border-slate-200/50 dark:border-slate-700/50 group-hover:text-[var(--accent)] group-hover:border-[var(--accent)]/30'}
-           `}>
-             {set.np}
-           </span>
-           {isMastered && (
-             <div className="flex items-center gap-1 text-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg border border-emerald-100/50 dark:border-emerald-900/30 backdrop-blur-sm">
-                <ShieldCheck size={12} />
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider">Complete</span>
-             </div>
+        {/* Status Icon */}
+        <div className="flex items-center justify-center w-12 h-12 rounded-2xl shrink-0 ml-2 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 text-slate-400 group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+           {isMastered ? <ShieldCheck size={20} className="text-emerald-500" /> : (
+             isHighStakes ? <AlertCircle size={20} className="text-rose-500" /> : <Zap size={20} />
            )}
-           {isHighStakes && !isMastered && (
-             <div className="flex items-center gap-1 text-rose-500 bg-rose-50/50 dark:bg-rose-900/20 px-2 py-1 rounded-lg border border-rose-100/50 dark:border-rose-900/30 backdrop-blur-sm">
-                <AlertCircle size={12} />
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider">Focus</span>
-             </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-3">
+             <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight group-hover:text-[var(--accent)] transition-colors truncate">
+               {set.setName}
+             </h3>
+             {isMastered && <span className="hidden md:inline-block px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 text-[9px] font-black uppercase rounded">Complete</span>}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate max-w-3xl">
+            {set.setDescription}
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex flex-col items-end justify-center w-24 shrink-0">
+           <span className="text-lg font-black text-slate-900 dark:text-white leading-none">{progress}%</span>
+           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{stats.total} items</span>
+        </div>
+
+        {/* Actions */}
+        <button 
+          onClick={() => onStart(set.setId)}
+          className={`h-12 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 shadow-sm
+            ${isMastered 
+              ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700' 
+              : 'bg-[var(--accent)] hover:brightness-110 text-white shadow-[var(--accent-glow)]'
+            }`}
+        >
+          {isMastered ? 'Review' : 'Start'} <ChevronRight size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  // --- GRID LAYOUT ---
+  return (
+    <div className={`group relative flex flex-col h-full min-h-[220px] rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:-translate-y-2
+      bg-white dark:bg-darkcard 
+      border border-slate-100 dark:border-white/5
+      shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]
+      hover:shadow-2xl hover:shadow-[var(--accent-glow)]
+      hover:border-[var(--accent)]/30
+    `}>
+      {/* Background Accent */}
+      <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-[var(--accent-soft)]/30 to-transparent rounded-bl-full -mr-10 -mt-10 pointer-events-none group-hover:scale-110 transition-transform duration-700" />
+
+      <div className="p-7 flex flex-col flex-grow relative z-10 space-y-5">
+        
+        {/* Header Badges */}
+        <div className="flex justify-between items-start">
+           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm transition-all duration-300
+             ${isMastered 
+               ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' 
+               : isHighStakes 
+                 ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-500' 
+                 : 'bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:bg-[var(--accent)] group-hover:text-white'
+             }`}>
+             {isMastered ? <CheckCircle2 size={20} /> : isHighStakes ? <AlertCircle size={20} /> : <Zap size={20} />}
+           </div>
+           
+           {isMastered && (
+             <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/30">
+               Completed
+             </span>
            )}
         </div>
 
         {/* Content */}
         <div className="space-y-2">
-          <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight group-hover:text-[var(--accent)] transition-colors duration-300 break-words hyphens-auto drop-shadow-sm">
+          <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight tracking-tight group-hover:text-[var(--accent)] transition-colors duration-300 line-clamp-2">
             {set.setName}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed line-clamp-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed line-clamp-3 text-pretty">
             {set.setDescription}
           </p>
         </div>
       </div>
 
-      {/* Bottom Section */}
-      <div className="p-6 pt-0 mt-auto relative z-10 space-y-4">
+      {/* Footer */}
+      <div className="p-7 pt-0 mt-auto relative z-10 space-y-5">
         
-        {/* Progress Bar & Stats */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            <span>{set.totalCards} Modules</span>
-            <span className={`${progress > 0 ? 'text-[var(--accent)]' : ''}`}>{progress}%</span>
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <span>Progress</span>
+            <span className={isMastered ? 'text-emerald-500' : 'text-[var(--accent)]'}>{progress}%</span>
           </div>
-          <div className="h-1.5 w-full bg-slate-100/50 dark:bg-slate-800/50 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div 
-              className={`h-full transition-all duration-1000 ease-out ${isMastered ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} 
+              className={`h-full transition-all duration-1000 ease-out ${isMastered ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]'}`} 
               style={{ width: `${progress}%` }} 
             />
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Button */}
         <button 
           onClick={() => onStart(set.setId)}
-          className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-[0.98] group/btn shadow-lg
+          className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg group/btn
             ${isMastered 
-              ? 'bg-emerald-50/80 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' 
-              : 'bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white shadow-[var(--accent)]/20 hover:shadow-[var(--accent)]/40 hover:scale-[1.02]'
+              ? 'bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-500 hover:text-[var(--accent)] hover:border-[var(--accent)]' 
+              : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-[var(--accent)] dark:hover:bg-[var(--accent)] dark:hover:text-white shadow-[var(--accent-glow)]'
             }`}
         >
-          {isMastered ? <Eye size={14} /> : <PlayCircle size={14} />}
-          <span>{isMastered ? 'Review' : 'Open'}</span>
-          {!isMastered && <ChevronRight size={14} className="opacity-0 group-hover/btn:opacity-100 group-hover/btn:translate-x-1 transition-all" />}
+          {isMastered ? <Eye size={16} /> : <PlayCircle size={16} />}
+          <span>{isMastered ? 'Review' : 'Start'}</span>
+          {!isMastered && <ChevronRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />}
         </button>
       </div>
     </div>

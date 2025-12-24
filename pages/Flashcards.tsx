@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { FlashcardCard } from '../components/FlashcardCard';
 import { TriageButtons } from '../components/TriageButtons';
@@ -5,7 +6,6 @@ import { DeckGrid } from '../components/DeckGrid';
 import { SetGrid } from '../components/SetGrid';
 import { DeckDetails } from '../components/DeckDetails';
 import { CardBrowser } from '../components/CardBrowser';
-import { adaptCards } from '../utils/adaptCards';
 import { DECKS, DECK_LIST } from '../data/deck_config';
 import { FlashcardUI, GradeStatus, MasteryStatus, DeckId, FlashcardsViewMode, SetMetadata, SessionFilters } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -43,8 +43,8 @@ export const Flashcards: React.FC<{
   onToggleFocus?: () => void;
   onResumeSession?: boolean;
   onExit?: () => void;
-}> = ({ initialFilters, onResumeSession, onExit }) => {
-  const { progress, applyGrade, toggleFlag, getCardMastery, setLastActive, lastSession } = useProgress();
+}> = ({ initialFilters, isFocusMode = false, onResumeSession, onExit }) => {
+  const { allCards, progress, applyGrade, toggleFlag, getCardMastery, setLastActive, lastSession } = useProgress();
   const { settings } = useSettings();
   const lastProcessedFiltersRef = useRef<string | null>(null);
 
@@ -92,20 +92,19 @@ export const Flashcards: React.FC<{
   const [elapsed, setElapsed] = useState(0);
 
   // --- DATA LOADING & PREP ---
-  
+  // Use allCards from context (includes edits) instead of static adaptCards()
   const { setsByNp, deckStats, setStats } = useMemo(() => {
     const dStats: Record<string, any> = {};
     const sStats: Record<string, any> = {};
     const sets: Record<string, SetMetadata[]> = {};
     const setTracking = new Set<string>();
-    const allCardsRaw = adaptCards();
     
     DECK_LIST.forEach(d => { 
       dStats[d.id] = { total: 0, unseen: 0, learning: 0, mastered: 0 }; 
       sets[d.id] = []; 
     });
 
-    allCardsRaw.forEach(card => {
+    allCards.forEach(card => {
       const dId = card.category;
       const sId = card.setId;
       const record = progress[card.id];
@@ -142,20 +141,17 @@ export const Flashcards: React.FC<{
     });
 
     return { deckStats: dStats, setStats: sStats, setsByNp: sets };
-  }, [progress, getCardMastery]);
+  }, [progress, getCardMastery, allCards]);
 
   const handleBack = useCallback(() => {
     if (viewMode === 'study') {
        if (isTargetedReview) {
-         // Return to analysis if it was a targeted review from there? 
-         // For now, exit to main dashboard or prev screen
          if (selectedSetId && viewMode === 'study' && !isTargetedReview) {
-            setViewMode('browser'); // Go back to browser for that set
+            setViewMode('browser');
          } else {
             onExit?.();
          }
        } else {
-         // Normal study mode back button returns to Browser
          setViewMode('browser');
          setIsRated(false);
          setSessionResults({});
@@ -171,7 +167,6 @@ export const Flashcards: React.FC<{
     }
   }, [viewMode, onExit, isTargetedReview, selectedSetId]);
 
-  // SAVE PROGRESS PERIODICALLY
   useEffect(() => {
     if (viewMode === 'study' && selectedSetId && !isTargetedReview && !isShuffleOn) {
       setLastActive(selectedDeckId, selectedSetId, currentIndex, selectedMastery);
@@ -205,8 +200,6 @@ export const Flashcards: React.FC<{
     };
   }, [sessionQueue, currentIndex, progress, getCardMastery]);
 
-  // --- SESSION INITIALIZATION ---
-
   const initializeStudySession = useCallback((
     setId: string | null, 
     startIdx = 0, 
@@ -214,23 +207,19 @@ export const Flashcards: React.FC<{
     specificCardIds?: string[],
     shuffle = false
   ) => {
-    const allCardsRaw = adaptCards();
     let finalQueue: any[] = [];
     let targeted = false;
 
-    // 1. Targeted Review (Specific IDs e.g. from "Focus on Again")
     if (specificCardIds && specificCardIds.length > 0) {
-      const cardsInList = allCardsRaw.filter(c => specificCardIds.includes(c.id));
+      const cardsInList = allCards.filter(c => specificCardIds.includes(c.id));
       finalQueue = cardsInList;
       targeted = true;
     } 
-    // 2. Set Based Study
     else if (setId) {
       let activeMastery = overrideFilters || selectedMastery;
-      let cardsInSet = allCardsRaw.filter(c => c.setId === setId);
+      let cardsInSet = allCards.filter(c => c.setId === setId);
 
       if (activeMastery.length > 0) {
-        // Filter by mastery if selected (e.g. "Unseen Only")
         finalQueue = cardsInSet.filter(c => {
            const record = progress[c.id];
            const mastery = getCardMastery(!!record?.seen, record?.goodCount || 0);
@@ -244,9 +233,8 @@ export const Flashcards: React.FC<{
 
     if (shuffle) {
       finalQueue = shuffleArray(finalQueue);
-      startIdx = 0; // Reset index if shuffled
+      startIdx = 0;
     } else {
-      // Default Sort: Unseen -> Learning -> Mastered
       finalQueue.sort((a, b) => {
          const mA = getCardMastery(!!progress[a.id]?.seen, progress[a.id]?.goodCount || 0);
          const mB = getCardMastery(!!progress[b.id]?.seen, progress[b.id]?.goodCount || 0);
@@ -259,22 +247,20 @@ export const Flashcards: React.FC<{
     setSessionQueue(finalQueue);
     setCurrentIndex(Math.min(startIdx, Math.max(0, finalQueue.length - 1)));
     
-    // Reset Session State
     setSessionResults({});
     setIsSessionFinished(false);
     setIsRated(false);
     setIsFlipped(false);
     setIsTargetedReview(targeted);
     setIsShuffleOn(shuffle);
-    setIsGradedMode(true); // Default to Graded mode on new session
+    setIsGradedMode(true);
     
     const effectiveDeckId = (finalQueue[0]?.category as DeckId) || selectedDeckId;
     if (effectiveDeckId) setSelectedDeckId(effectiveDeckId);
 
     setViewMode('study');
-  }, [progress, getCardMastery, selectedMastery, selectedDeckId]);
+  }, [progress, getCardMastery, selectedMastery, selectedDeckId, allCards]);
 
-  // Handle Set Click - Now opens Card Browser
   const handleSetClick = (setId: string) => {
     setSelectedSetId(setId);
     setViewMode('browser');
@@ -294,12 +280,9 @@ export const Flashcards: React.FC<{
     if (!selectedSetId) return;
     const newShuffleState = !isShuffleOn;
     setIsShuffleOn(newShuffleState);
-    // Restart session with shuffle preference
     initializeStudySession(selectedSetId, 0, selectedMastery, undefined, newShuffleState);
     setIsSettingsOpen(false);
   };
-
-  // --- NAVIGATION & INTERACTION ---
 
   const goToNextCard = useCallback(() => {
     setIsRated(false);
@@ -315,13 +298,9 @@ export const Flashcards: React.FC<{
   const handleRate = useCallback((grade: GradeStatus) => {
     if (!currentCard || showFeedback || isRated) return;
     
-    // 1. Update Global DB
     applyGrade(currentCard.id, grade);
-
-    // 2. Track Session Result
     setSessionResults(prev => ({ ...prev, [currentCard.id]: grade }));
     
-    // 3. UI Feedback
     let msg = '';
     let color = '';
     if (grade === 'again') {
@@ -343,31 +322,36 @@ export const Flashcards: React.FC<{
     }, 300); 
   }, [currentCard, showFeedback, isRated, applyGrade, settings.autoAdvance, goToNextCard]);
 
-  // Handle Initial Load
   useEffect(() => {
     const filterKey = JSON.stringify(initialFilters) + (onResumeSession ? '_resume' : '');
     if (lastProcessedFiltersRef.current !== filterKey) {
       lastProcessedFiltersRef.current = filterKey;
       if (onResumeSession && lastSession?.setId) {
-        // If resuming, maybe go straight to study? Or browser? 
-        // User logic usually implies clicking "Resume" means "Start Studying".
         initializeStudySession(lastSession.setId, lastSession.currentIndex);
       } else if (initialFilters?.cardIds) {
         initializeStudySession(null, 0, undefined, initialFilters.cardIds);
       } else if (initialFilters?.setId) {
-        // If loaded via filter, go to browser first or study?
-        // Let's assume browser for consistent flow if navigating to a set
         setSelectedSetId(initialFilters.setId);
         setViewMode('browser');
       }
     }
   }, [initialFilters, onResumeSession, initializeStudySession, lastSession]);
 
-  // Keyboard Shortcuts
   useEffect(() => {
     if (viewMode !== 'study' || isSessionFinished || !currentCard) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent shortcuts if user is typing in a form or editor (e.g. Edit Card Modal)
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.isContentEditable || 
+        target.closest('[contenteditable="true"]')
+      ) {
+        return;
+      }
+
       if (showFeedback) return;
       switch(e.key) {
         case ' ':
@@ -385,12 +369,10 @@ export const Flashcards: React.FC<{
           if (isGradedMode && isFlipped && !isRated) handleRate('good');
           break;
         case 'ArrowLeft':
-          // Navigation restricted in Graded Mode unless reviewing
           if (!isGradedMode && currentIndex > 0) setCurrentIndex(prev => prev - 1);
           break;
         case 'ArrowRight':
           if (isRated && !settings.autoAdvance) goToNextCard();
-          // Navigation restricted in Graded Mode unless rated
           else if (!isGradedMode && currentIndex < sessionQueue.length - 1) setCurrentIndex(prev => prev + 1);
           break;
       }
@@ -399,17 +381,12 @@ export const Flashcards: React.FC<{
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, isSessionFinished, currentCard, isFlipped, isRated, handleRate, currentIndex, sessionQueue.length, showFeedback, settings.autoAdvance, goToNextCard, isGradedMode]);
 
-  // --- RENDER HELPERS ---
-
   const studyProgressPercent = Math.round(((currentIndex + 1) / (sessionQueue.length || 1)) * 100);
   
-  // Calculate End Screen Stats
   const knowCount = Object.values(sessionResults).filter(r => r === 'good').length;
   const learningCount = Object.values(sessionResults).filter(r => r === 'again').length;
   const totalPlayed = knowCount + learningCount;
   const masteryPercent = totalPlayed > 0 ? Math.round((knowCount / totalPlayed) * 100) : 0;
-
-  // --- RENDER ---
 
   if (viewMode !== 'study') {
     return (
@@ -424,14 +401,24 @@ export const Flashcards: React.FC<{
           <CardBrowser 
             setId={selectedSetId} 
             onBack={() => setViewMode('sets')} 
-            onStudy={() => initializeStudySession(selectedSetId, 0)}
+            isSidebarOpen={!isFocusMode}
+            onStudy={(filters) => {
+              const startIdx = filters?.startIndex || 0;
+              if (filters?.cardIds) {
+                initializeStudySession(null, 0, undefined, filters.cardIds, filters?.shuffle);
+              } else if (filters?.setId) {
+                initializeStudySession(filters.setId, startIdx, filters.mastery, undefined, filters?.shuffle);
+              } else {
+                initializeStudySession(selectedSetId, 0, undefined, undefined, filters?.shuffle);
+              }
+            }}
           />
         )}
       </div>
     );
   }
 
-  // Header Title
+  // ... (rest of render logic remains same)
   let headerTitle = 'Review';
   if (isTargetedReview) headerTitle = 'Focused Review';
   else if (selectedSetId) headerTitle = setsByNp[selectedDeckId || 'NP1']?.find(s => s.setId === selectedSetId)?.setName || 'Unknown Set';
@@ -560,7 +547,7 @@ export const Flashcards: React.FC<{
 
         <div className="w-full h-full max-w-5xl min-h-0 flex flex-col items-center justify-center relative">
           
-          {/* NAVIGATION ARROWS (Desktop) - Always visible in Browse Mode, hidden in Graded Mode */}
+          {/* NAVIGATION ARROWS (Desktop) */}
           {!isSessionFinished && !isGradedMode && (
             <>
               <button 
@@ -661,7 +648,7 @@ export const Flashcards: React.FC<{
               <div className="flex-1 min-h-0 mb-3 md:mb-6 w-full max-w-4xl mx-auto">
                 <FlashcardCard 
                   card={currentCard} 
-                  isFlipped={isFlipped} 
+                  isFlipped={isFlipped}
                   textSize={isLargeText ? 'large' : 'normal'}
                   onToggleFlag={() => toggleFlag(currentCard.id)}
                   onFlip={() => {

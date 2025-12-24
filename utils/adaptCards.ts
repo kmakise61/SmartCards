@@ -40,6 +40,7 @@ export const adaptCards = (): FlashcardUI[] => {
       seen: false,
       isFlagged: false,
       lastGrade: null,
+      // Note: SRS fields (interval, easeFactor) are no longer mapped or used.
     });
   });
 

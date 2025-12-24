@@ -12,8 +12,9 @@ export interface Flashcard {
   tags: string[];
   hint?: string;
   status: string;
-  interval: number;
-  easeFactor: number;
+  // Deprecated SRS fields (kept for data compatibility, not used in logic)
+  interval?: number;
+  easeFactor?: number;
 }
 
 export type MasteryStatus = 'unseen' | 'learning' | 'mastered';
@@ -31,22 +32,36 @@ export interface FlashcardUI extends Flashcard {
   stableCount: number;
   criticalCount: number;
   seen: boolean;
-  isFlagged: boolean; // New: User bookmark
+  isFlagged: boolean;
   lastGrade: GradeStatus | null;
+}
+
+export interface CardEdit {
+  id: string;
+  question: string;
+  answer: string;
+  rationale: string;
+  updatedAt: number;
 }
 
 export type ViewState = 'dashboard' | 'flashcards' | 'analytics';
 export type FlashcardsViewMode = 'decks' | 'sets' | 'details' | 'study' | 'browser';
-export type AccentPreset = 'pink' | 'rose' | 'violet' | 'cyan';
+export type AccentPreset = 'pink' | 'rose' | 'violet' | 'cyan'; // Kept for reference
 
 export interface UserSettings {
-  accent: AccentPreset;
+  accent: string; // Updated to string for Hex support
   softMode: boolean;
   sortByLowest: boolean;
   autoAdvance: boolean;
   showKeyboardHints: boolean;
   showCardNumbers: boolean;
   autoResume: boolean;
+  // Speech Settings
+  voiceURI?: string;
+  speechRate: number;
+  speechPitch: number;
+  // Data Settings
+  lastBackupDate?: number;
 }
 
 export type SessionGoal = 10 | 25 | 50 | 'unlimited';
@@ -56,7 +71,7 @@ export interface MasteryRecord {
   goodCount: number;
   criticalCount: number;
   lastGrade: GradeStatus | null;
-  isFlagged?: boolean; // New: Persist flag
+  isFlagged?: boolean;
   updatedAt: number;
 }
 
@@ -100,5 +115,18 @@ export interface SessionFilters {
   deckId?: DeckId;
   setId?: string;
   cardIds?: string[];
-  onlyFlagged?: boolean; // New: Filter by flagged
+  onlyFlagged?: boolean;
+  startIndex?: number;
+  shuffle?: boolean;
+}
+
+export interface ExamRecord {
+  id: string;
+  date: number;
+  deckId: string;
+  totalItems: number;
+  correctCount: number;
+  score: number;
+  incorrectCardIds: string[];
+  durationSeconds: number;
 }

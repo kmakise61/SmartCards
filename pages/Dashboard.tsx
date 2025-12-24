@@ -1,6 +1,5 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { adaptCards } from '../utils/adaptCards';
 import { MasteryStatus, DeckConfig, SessionFilters } from '../types';
 import { DECK_LIST } from '../data/deck_config';
 import { useProgress } from '../context/ProgressContext';
@@ -18,12 +17,16 @@ import {
   Zap,
   Waves,
   Clock,
-  TrendingUp,
-  Target
+  Target,
+  PlusCircle,
+  Search,
+  BookOpen
 } from 'lucide-react';
 
 interface DashboardProps {
   onStartSession: (filters?: SessionFilters, resume?: boolean) => void;
+  onOpenCustomSession?: () => void;
+  onOpenSearch?: () => void;
 }
 
 const calculateDashboardStats = (
@@ -55,19 +58,24 @@ const calculateDashboardStats = (
   let totalCards = 0;
   let masteredCount = 0;
   let seenCount = 0;
+  let learningCount = 0;
 
   allCards.forEach(card => {
     totalCards++;
     const record = progress[card.id];
     if (record?.seen) {
       seenCount++;
-      if (getCardMastery(true, record.goodCount) === 'mastered') {
+      const status = getCardMastery(true, record.goodCount);
+      if (status === 'mastered') {
         masteredCount++;
+      } else if (status === 'learning') {
+        learningCount++;
       }
     }
   });
 
   const overallMastery = totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
+  const unseenCount = totalCards - seenCount;
 
   let rank = "Novice";
   if (overallMastery > 85) rank = "Expert";
@@ -85,15 +93,17 @@ const calculateDashboardStats = (
     metrics, 
     overallMastery, 
     seenCount, 
-    masteredCount, 
+    masteredCount,
+    learningCount,
+    unseenCount,
     totalCards, 
     rank, 
     lowestCoreDeckId
   };
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
-  const { progress, getCardMastery, lastSession } = useProgress();
+export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCustomSession, onOpenSearch }) => {
+  const { allCards, progress, getCardMastery, lastSession } = useProgress();
   const { settings, updateSettings } = useSettings();
   const [greeting, setGreeting] = useState('Welcome');
   
@@ -105,7 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
     else setGreeting('Good Evening');
   }, []);
   
-  const allCards = useMemo(() => adaptCards(), []);
+  // Use allCards from context (includes edits) instead of static adaptCards()
   const stats = useMemo(() => 
     calculateDashboardStats(allCards, progress, getCardMastery), 
     [allCards, progress, getCardMastery]
@@ -118,6 +128,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
     }
     return list;
   }, [settings.sortByLowest, stats.metrics]);
+
+  const handleStatusClick = (status: MasteryStatus) => {
+    const targetIds = allCards.filter(c => {
+       const record = progress[c.id];
+       return getCardMastery(!!record?.seen, record?.goodCount || 0) === status;
+    }).map(c => c.id);
+
+    if (targetIds.length > 0) {
+       onStartSession({ cardIds: targetIds });
+    }
+  };
 
   const DomainCard: React.FC<{ deck: DeckConfig }> = ({ deck }) => {
     const m = stats.metrics[deck.id];
@@ -191,19 +212,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
         {/* === LEFT COLUMN (Hero + Domains) === */}
         <div className="lg:col-span-8 space-y-8">
           
-          {/* 1. HERO CARD (Visual Anchor) - MINIMIZED */}
+          {/* 1. HERO CARD */}
           <div className="relative group overflow-hidden rounded-[2.5rem] border shadow-2xl min-h-[220px] flex items-center transition-all duration-500
             bg-white border-white/20 
             dark:bg-slate-950 dark:border-[var(--accent)]/40 
             dark:shadow-[0_0_50px_rgba(var(--accent-rgb),0.15)]
           ">
-            {/* LIGHT MODE: Vibrant Gradient (Now simpler to respect accent) */}
+            {/* LIGHT MODE: Vibrant Gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-indigo-600 opacity-90 dark:opacity-0 transition-opacity duration-500" />
             
-            {/* DARK MODE: Deep Space with Radial Glow (Using RGB var for proper opacity) */}
+            {/* DARK MODE: Deep Space with Radial Glow */}
             <div className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_top_right,_rgba(var(--accent-rgb),0.25),_transparent_70%)]" />
             
-            {/* Texture Overlay (Common) */}
+            {/* Texture Overlay */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
             
             <div className="relative p-6 md:p-8 z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 w-full">
@@ -220,13 +241,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
                    )}
                 </div>
                 
-                {/* Typography (Scaled Down) */}
+                {/* Typography */}
                 <div className="space-y-2">
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[0.95] tracking-tight drop-shadow-md">
                     {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/60">Future RN!</span>
                   </h1>
                   <p className="text-white/90 font-medium text-xs md:text-sm leading-relaxed max-w-md mx-auto md:mx-0 text-shadow-sm">
-                    High-velocity validation modules ready.
+                    Mastery tracking is active. Focus on core domains to build retention.
                   </p>
                 </div>
 
@@ -236,13 +257,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
                     onClick={() => lastSession?.setId ? onStartSession({}, true) : onStartSession({ deckId: 'NP1' })}
                     className="bg-white text-slate-900 px-6 py-3 rounded-2xl font-black shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em] flex items-center gap-3 group/btn w-full sm:w-auto justify-center"
                   >
-                    {lastSession?.setId ? 'Resume' : 'Start'} 
+                    {lastSession?.setId ? 'Resume' : 'Start NP1'} 
                     <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
                   </button>
+                  
+                  {onOpenCustomSession && (
+                    <button 
+                      onClick={onOpenCustomSession}
+                      className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-2xl font-black shadow-sm hover:bg-white/20 active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em] flex items-center gap-3 group/btn w-full sm:w-auto justify-center"
+                    >
+                      <PlusCircle size={14} /> Custom Cram
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Illustration (Smaller) */}
+              {/* Illustration */}
               <div className="hidden md:block relative w-40 h-40 shrink-0">
                  <div className="absolute inset-0 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm animate-[spin_60s_linear_infinite]" />
                  <div className="absolute inset-2 bg-white/5 rounded-full border border-white/10 animate-[spin_40s_linear_infinite_reverse]" />
@@ -259,15 +289,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
               <h3 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
                 <Brain size={16} className="text-[var(--accent)]" /> Knowledge Architecture
               </h3>
-              <button 
-                onClick={() => updateSettings({ sortByLowest: !settings.sortByLowest })}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${settings.sortByLowest ? 'bg-[var(--accent)] text-white border-transparent shadow-lg shadow-[var(--accent-glow)]' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-white/10'}`}
-              >
-                <Filter size={10} /> {settings.sortByLowest ? 'Focus Priority' : 'Standard Sort'}
-              </button>
+              <div className="flex items-center gap-2">
+                {onOpenSearch && (
+                  <button 
+                    onClick={onOpenSearch}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-white/10 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    <Search size={10} /> Find Topic
+                  </button>
+                )}
+                <button 
+                  onClick={() => updateSettings({ sortByLowest: !settings.sortByLowest })}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${settings.sortByLowest ? 'bg-[var(--accent)] text-white border-transparent shadow-lg shadow-[var(--accent-glow)]' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-white/10'}`}
+                >
+                  <Filter size={10} /> {settings.sortByLowest ? 'Focus Priority' : 'Standard Sort'}
+                </button>
+              </div>
             </div>
             
-            {/* Grid Logic: 1 col mobile, 2 col tablet, 3 col desktop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {sortedDecks.map(deck => <DomainCard key={deck.id} deck={deck} />)}
             </div>
@@ -303,20 +342,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
                    </svg>
                 </div>
 
-                {/* Metrics Row */}
-                <div className="grid grid-cols-2 gap-4 w-full border-t border-slate-100 dark:border-white/5 pt-6">
-                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                      <div className="text-2xl font-black text-slate-800 dark:text-white">{stats.seenCount}</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Seen</div>
-                   </div>
-                   <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10">
-                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.masteredCount}</div>
-                      <div className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Mastered</div>
-                   </div>
+                {/* Metrics Row (Clickable) */}
+                <div className="grid grid-cols-3 gap-3 w-full border-t border-slate-100 dark:border-white/5 pt-6">
+                   <button 
+                     onClick={() => handleStatusClick('mastered')}
+                     className="p-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 hover:scale-105 active:scale-95 transition-all"
+                   >
+                      <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{stats.masteredCount}</div>
+                      <div className="text-[7px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Mastered</div>
+                   </button>
+                   <button 
+                     onClick={() => handleStatusClick('learning')}
+                     className="p-2 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20 hover:scale-105 active:scale-95 transition-all"
+                   >
+                      <div className="text-xl font-black text-amber-600 dark:text-amber-500">{stats.learningCount}</div>
+                      <div className="text-[7px] font-black text-amber-600/70 dark:text-amber-500/70 uppercase tracking-widest">Learning</div>
+                   </button>
+                   <button 
+                     onClick={() => handleStatusClick('unseen')}
+                     className="p-2 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all"
+                   >
+                      <div className="text-xl font-black text-slate-800 dark:text-white">{stats.unseenCount}</div>
+                      <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Unseen</div>
+                   </button>
                 </div>
 
                 <button 
-                   onClick={() => onStartSession({ mastery: ['learning'] })}
+                   onClick={() => handleStatusClick('learning')}
                    className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-[1.02] active:scale-[0.98] rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg"
                 >
                   Bridge Weak Links
@@ -329,26 +381,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession }) => {
              </div>
           </div>
 
-          {/* 4. CLINICAL PROTOCOL CARD (High Contrast Dark Mode) */}
+          {/* 4. CLINICAL PROTOCOL CARD (Fully Responsive) */}
           <div className="relative overflow-hidden rounded-[2.5rem] p-8 border transition-all duration-300
-            bg-white border-indigo-50/50 shadow-sm
-            dark:bg-slate-900 dark:border-indigo-500/30 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
+            bg-white border-indigo-100 shadow-sm
+            dark:bg-darkcard dark:border-indigo-500/20 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
           ">
+              {/* Light Mode Glow Effect (Subtle) */}
+              <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none opacity-60 dark:hidden" />
+
               {/* Dark Mode Glow Effect */}
-              <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none" />
+              <div className="hidden dark:block absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none" />
 
               <div className="flex items-center gap-4 mb-6 relative z-10">
-                 <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 flex items-center justify-center shrink-0">
+                 {/* Icon Container: Dark/Light Adaptive */}
+                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg 
+                    bg-indigo-600 text-white shadow-indigo-200
+                    dark:bg-indigo-500/20 dark:text-indigo-400 dark:shadow-none
+                 ">
                     <Target size={24} />
                  </div>
                  <div>
                    <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Strategic Protocol</h4>
-                   <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400"> AI-Driven Insight</span>
+                   <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400"> AI-Driven Insight</span>
                  </div>
               </div>
               
-              <div className="relative z-10 pl-4 border-l-2 border-indigo-100 dark:border-indigo-500/40">
-                <p className="text-xs text-slate-600 dark:text-indigo-200/80 font-medium leading-relaxed">
+              <div className="relative z-10 pl-4 border-l-2 border-indigo-100 dark:border-indigo-500/20">
+                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed text-pretty">
                   {stats.overallMastery < 20 
                     ? `Immediate Priority: ${stats.lowestCoreDeckId.id}. Stabilize core concepts before engaging with high-complexity scenarios.`
                     : `High performance baseline in ${stats.lowestCoreDeckId.id}. Strategy: Shift to rapid-fire mixed validation sessions.`}

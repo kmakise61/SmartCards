@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserSettings, AccentPreset } from '../types';
+import { UserSettings } from '../types';
 import { db } from '../utils/db';
 
 interface SettingsContextType {
@@ -9,30 +9,34 @@ interface SettingsContextType {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
-  accent: 'pink',
+  accent: '#F472B6', // Default Pink-400
   softMode: false,
   sortByLowest: false,
   autoAdvance: true,
   showKeyboardHints: true,
   showCardNumbers: true,
   autoResume: true,
+  voiceURI: undefined,
+  speechRate: 1.1,
+  speechPitch: 1.0,
 };
 
-const ACCENT_COLORS: Record<AccentPreset, { main: string; soft: string; glow: string }> = {
-  pink: { main: '#F472B6', soft: 'rgba(244, 114, 182, 0.1)', glow: 'rgba(244, 114, 182, 0.3)' },
-  rose: { main: '#FB7185', soft: 'rgba(251, 113, 133, 0.1)', glow: 'rgba(251, 113, 133, 0.3)' },
-  violet: { main: '#A78BFA', soft: 'rgba(167, 139, 250, 0.1)', glow: 'rgba(167, 139, 250, 0.3)' },
-  cyan: { main: '#22D3EE', soft: 'rgba(34, 211, 238, 0.1)', glow: 'rgba(34, 211, 238, 0.3)' },
-};
-
-const SOFT_MODE_ACCENT = { main: '#0D9488', soft: 'rgba(13, 148, 136, 0.1)', glow: 'rgba(13, 148, 136, 0.3)' }; // Teal-600
+const SOFT_MODE_ACCENT = '#0D9488'; // Teal-600
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 // Helper to convert Hex to RGB string (e.g. "255, 0, 0")
 const hexToRgb = (hex: string) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+  let c: any;
+  if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+      c = hex.substring(1).split('');
+      if(c.length === 3){
+          c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+      }
+      c = '0x' + c.join('');
+      return [(c>>16)&255, (c>>8)&255, c&255].join(',');
+  }
+  return '0, 0, 0';
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,6 +49,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const saved = await db.loadSettings();
         if (saved) {
+          // Merge saved settings with defaults to ensure all fields exist
           setSettings({ ...DEFAULT_SETTINGS, ...saved });
         }
       } catch (e) {
@@ -58,16 +63,25 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Effect to update CSS variables whenever settings change
   useEffect(() => {
-    const colors = settings.softMode ? SOFT_MODE_ACCENT : ACCENT_COLORS[settings.accent];
+    let mainColor = settings.accent;
+    
+    // Override if soft mode is active
+    if (settings.softMode) {
+        mainColor = SOFT_MODE_ACCENT;
+    }
+
+    // Fallback if invalid color
+    if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(mainColor)) {
+        mainColor = DEFAULT_SETTINGS.accent;
+    }
+
+    const rgb = hexToRgb(mainColor);
     const root = document.documentElement;
     
-    root.style.setProperty('--accent', colors.main);
-    root.style.setProperty('--accent-soft', colors.soft);
-    root.style.setProperty('--accent-glow', colors.glow);
-    
-    // Set RGB components for rgba() usage in CSS
-    const rgb = hexToRgb(colors.main);
+    root.style.setProperty('--accent', mainColor);
     root.style.setProperty('--accent-rgb', rgb);
+    root.style.setProperty('--accent-soft', `rgba(${rgb}, 0.1)`);
+    root.style.setProperty('--accent-glow', `rgba(${rgb}, 0.3)`);
     
   }, [settings]);
 
@@ -80,7 +94,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
-  if (!loaded) return null; // Or a loading spinner if preferred
+  if (!loaded) return null;
 
   return (
     <SettingsContext.Provider value={{ settings, updateSettings }}>

@@ -1,15 +1,17 @@
+
 import React from 'react';
 import { ViewState } from '../types';
-import { Moon, Sun, Calendar, Settings, Menu } from 'lucide-react';
+import { Moon, Sun, Calendar, Settings, Menu, Search } from 'lucide-react';
 
 interface TopbarProps {
   currentView: ViewState;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   onOpenSettings: () => void;
+  onOpenSearch?: () => void;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ currentView, theme, toggleTheme, onOpenSettings }) => {
+export const Topbar: React.FC<TopbarProps> = ({ currentView, theme, toggleTheme, onOpenSettings, onOpenSearch }) => {
   const formattedDate = new Intl.DateTimeFormat('en-US', { 
     weekday: 'short', 
     month: 'short', 
@@ -25,12 +27,32 @@ export const Topbar: React.FC<TopbarProps> = ({ currentView, theme, toggleTheme,
       </div>
 
       <div className="flex items-center space-x-2 md:space-x-4">
+        {onOpenSearch && (
+          <button 
+            onClick={onOpenSearch}
+            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+            aria-label="Search"
+          >
+            <Search size={18} />
+          </button>
+        )}
+
         <div className="hidden sm:flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white dark:bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
           <Calendar size={12} className="text-[var(--accent)]" />
           <span>{formattedDate}</span>
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
+            {onOpenSearch && (
+              <button 
+                onClick={onOpenSearch}
+                className="hidden md:flex w-10 h-10 rounded-xl items-center justify-center text-slate-500 hover:bg-white dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                title="Global Search (Cmd+K)"
+              >
+                <Search size={18} />
+              </button>
+            )}
+
             <button 
                 onClick={toggleTheme}
                 className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
