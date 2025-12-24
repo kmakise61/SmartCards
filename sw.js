@@ -1,14 +1,15 @@
-const CACHE_NAME = 'pnle-smartcards-v5';
-const ASSETS_TO_CACHE = [
-  'index.html',
-  'icon.svg',
-  'manifest.json'
-];
+const CACHE_NAME = 'pnle-smartcards-v7';
 
 self.addEventListener('install', (event) => {
+  // Use absolute URLs for caching based on the service worker's scope
+  const rootUrl = new URL('./', self.registration.scope).href;
+  const indexUrl = new URL('./index.html', self.registration.scope).href;
+  const iconUrl = new URL('./icon.svg', self.registration.scope).href;
+  const manifestUrl = new URL('./manifest.json', self.registration.scope).href;
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll([rootUrl, indexUrl, iconUrl, manifestUrl]);
     })
   );
   self.skipWaiting();
@@ -28,17 +29,27 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Handle SPA Navigation: Always serve index.html for document requests
+  const shellUrl = new URL('./index.html', self.registration.scope).href;
+
+  // SPA Navigation handling:
+  // For any navigation request (launch from home screen, browser refresh on a route),
+  // immediately serve the cached app shell (index.html).
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match('index.html').then((response) => {
-        return response || fetch(event.request);
+      caches.match(shellUrl).then((cachedResponse) => {
+        // Return cached shell or fetch the specific shell file if missing
+        return cachedResponse || fetch(shellUrl).then((response) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(shellUrl, response.clone());
+            return response;
+          });
+        });
       })
     );
     return;
   }
 
-  // Regular asset caching (Cache-First)
+  // Regular static asset handling
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
