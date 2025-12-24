@@ -153,58 +153,35 @@
     
     <script type="module" src="./index.tsx"></script>
 
-    <div id="sw-debug" style="position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.85); color:#00ff00; font-family:monospace; font-size:10px; padding:10px; z-index:9999; pointer-events:none; min-height: 50px;">
-      SW Status: Initializing...
-    </div>
-
     <script>
-      function logSW(msg) {
-        const el = document.getElementById('sw-debug');
-        if (el) el.innerHTML += '<br>' + msg;
-      }
-
+      // Global PWA prompt state
       window.deferredPrompt = null;
       
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         window.deferredPrompt = e;
         window.dispatchEvent(new CustomEvent('pwa-install-available'));
-        logSW('📱 Install Prompt Ready');
       });
 
       window.addEventListener('appinstalled', (event) => {
         window.deferredPrompt = null;
-        logSW('🎉 App Installed!');
+        console.log('PNLE SmartCards was installed.');
       });
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          // Use a slight delay to ensure first paint is stable
           setTimeout(() => {
             navigator.serviceWorker.register('/sw.js', { scope: '/' })
               .then(registration => {
-                logSW('✅ SW Registered!');
-                
-                if (registration.installing) logSW('⚙️ SW Installing...');
-                if (registration.waiting) logSW('⏳ SW Waiting...');
-                if (registration.active) logSW('🚀 SW Active!');
-
-                registration.addEventListener('updatefound', () => {
-                  const newWorker = registration.installing;
-                  logSW('📦 New version found...');
-                  newWorker.state = 'installing';
-                  newWorker.addEventListener('statechange', () => {
-                    logSW('SW State: ' + newWorker.state);
-                  });
-                });
+                console.log('SW registered: ', registration);
               })
               .catch(registrationError => {
-                logSW('❌ SW FAIL: ' + registrationError.message);
+                console.log('SW registration failed: ', registrationError);
               });
           }, 1000);
         });
-      } else {
-        logSW('⚠️ Service Worker not supported');
       }
     </script>
-    </body>
+  </body>
 </html>
