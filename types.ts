@@ -2,10 +2,10 @@
 export interface Flashcard {
   id: string;
   deckId: string;
-  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
   setId: string;
-  setName: string;
-  setDescription: string;
+  setName?: string;
+  setDescription?: string;
   setTags?: string[];
   front: string;
   back: string;
@@ -44,7 +44,7 @@ export interface CardEdit {
   updatedAt: number;
 }
 
-export type ViewState = 'dashboard' | 'flashcards' | 'analytics';
+export type ViewState = 'dashboard' | 'flashcards' | 'analytics' | 'quiz';
 export type FlashcardsViewMode = 'decks' | 'sets' | 'details' | 'study' | 'browser';
 export type AccentPreset = 'pink' | 'rose' | 'violet' | 'cyan'; // Kept for reference
 
@@ -62,6 +62,9 @@ export interface UserSettings {
   speechPitch: number;
   // Data Settings
   lastBackupDate?: number;
+  // Exam Settings
+  targetExamDate?: number; // Timestamp
+  dailyGoal: number; // New: Target cards per day
 }
 
 export type SessionGoal = 10 | 25 | 50 | 'unlimited';
@@ -75,6 +78,12 @@ export interface MasteryRecord {
   updatedAt: number;
 }
 
+export interface DailyStats {
+  date: string; // YYYY-MM-DD
+  count: number; // Cards reviewed today
+  streak: number; // Consecutive days
+}
+
 export interface DeckIdStats {
   total: number;
   unseen: number;
@@ -83,7 +92,7 @@ export interface DeckIdStats {
   progress: number;
 }
 
-export type DeckId = "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+export type DeckId = "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
 
 export interface DeckConfig {
   id: DeckId;
@@ -91,6 +100,7 @@ export interface DeckConfig {
   subtitle: string;
   description: string;
   isSupplemental?: boolean;
+  visibility: ('dashboard' | 'quiz')[];
 }
 
 export interface SetMetadata {
@@ -98,7 +108,7 @@ export interface SetMetadata {
   setName: string;
   setDescription: string;
   setTags: string[];
-  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL";
+  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
   totalCards: number;
 }
 
@@ -129,4 +139,13 @@ export interface ExamRecord {
   score: number;
   incorrectCardIds: string[];
   durationSeconds: number;
+}
+
+export interface QuizSessionRecord {
+  id: string;
+  date: number;
+  deckId: string;
+  totalItems: number;
+  correctCount: number;
+  score: number;
 }

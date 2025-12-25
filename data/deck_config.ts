@@ -6,45 +6,60 @@ export const DECKS: Record<DeckId, DeckConfig> = {
     id: "NP1",
     title: "Community Health Nursing",
     subtitle: "Public Health & Epidemiology",
-    description: "Foundations of CHN, DOH Programs, Epidemiology, Health Statistics, and Community Organizing (COPAR)."
+    description: "Foundations of CHN, DOH Programs, Epidemiology, Health Statistics, and Community Organizing (COPAR).",
+    visibility: ['dashboard']
   },
   NP2: {
     id: "NP2",
     title: "Maternal & Child Nursing",
     subtitle: "Reproductive & Pediatric Health",
-    description: "Comprehensive care for the mother and child across the lifespan, from conception through adolescent growth."
+    description: "Comprehensive care for the mother and child across the lifespan, from conception through adolescent growth.",
+    visibility: ['dashboard']
   },
   NP3: {
     id: "NP3",
     title: "Med-Surg Nursing I",
     subtitle: "Oxygenation & Foundations",
-    description: "Surgery protocols, Respiratory care, Cardiovascular health, and Fluid & Electrolyte balance."
+    description: "Surgery protocols, Respiratory care, Cardiovascular health, and Fluid & Electrolyte balance.",
+    visibility: ['dashboard']
   },
   NP4: {
     id: "NP4",
     title: "Med-Surg Nursing II",
     subtitle: "Metabolic & Systemic Health",
-    description: "Gastrointestinal, Endocrine, Metabolic disorders, MSK, and Sensory-Neurological clinical management."
+    description: "Gastrointestinal, Endocrine, Metabolic disorders, MSK, and Sensory-Neurological clinical management.",
+    visibility: ['dashboard']
   },
   NP5: {
     id: "NP5",
     title: "Psychiatric & Critical Care",
     subtitle: "Mental Health & Management",
-    description: "Maladaptive behaviors, Psychiatric nursing, Acute/Critical Care, and Leadership & Management principles."
+    description: "Maladaptive behaviors, Psychiatric nursing, Acute/Critical Care, and Leadership & Management principles.",
+    visibility: ['dashboard']
   },
   PHARM_LABS: {
     id: "PHARM_LABS",
     title: "Pharmacology & Labs",
     subtitle: "High-Yield Fundamentals",
     description: "Strategic drug classifications, therapeutic ranges, critical laboratory values, and clinical antidotes.",
-    isSupplemental: true
+    isSupplemental: true,
+    visibility: ['dashboard']
   },
   PRIO_DEL: {
     id: "PRIO_DEL",
     title: "Prioritization & Delegation",
     subtitle: "Strategic Nursing Logic",
     description: "Clinical prioritization frameworks (ABC, Maslow), delegation protocols, and staff assignment logic.",
-    isSupplemental: true
+    isSupplemental: true,
+    visibility: ['dashboard']
+  },
+  MEDSURG_SIGNS: {
+    id: "MEDSURG_SIGNS",
+    title: "Clinical Signs & Triads",
+    subtitle: "Pathognomonic Gizmos",
+    description: "Master high-yield signs, syndromes, and triads using active recall cloze deletion strategy.",
+    isSupplemental: true,
+    visibility: ['quiz'] // Only visible in Active Recall mode
   }
 };
 

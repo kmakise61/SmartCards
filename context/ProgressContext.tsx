@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { MasteryRecord, GradeStatus, MasteryStatus, LastSessionState, DeckId, CardEdit, FlashcardUI } from '../types';
+import { MasteryRecord, GradeStatus, MasteryStatus, LastSessionState, DeckId, CardEdit, FlashcardUI, DailyStats } from '../types';
 import { db } from '../utils/db';
 import { adaptCards } from '../utils/adaptCards';
 
@@ -9,6 +9,7 @@ interface ProgressContextType {
   progress: Record<string, MasteryRecord>;
   lastSession: LastSessionState | null;
   cardEdits: Record<string, CardEdit>;
+  dailyStats: DailyStats;
   applyGrade: (cardId: string, grade: GradeStatus) => void;
   toggleFlag: (cardId: string) => void;
   saveCardEdit: (edit: CardEdit) => void;
@@ -24,21 +25,26 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [progress, setProgress] = useState<Record<string, MasteryRecord>>({});
   const [cardEdits, setCardEdits] = useState<Record<string, CardEdit>>({});
   const [lastSession, setLastSession] = useState<LastSessionState | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyStats>({ date: '', count: 0, streak: 0 });
   const [loaded, setLoaded] = useState(false);
 
   // Initialize from IndexedDB
   useEffect(() => {
     const init = async () => {
       try {
-        const [loadedProgress, loadedSession, loadedEdits] = await Promise.all([
+        const [loadedProgress, loadedSession, loadedEdits, loadedStats] = await Promise.all([
           db.loadAllProgress(),
           db.loadSession(),
-          db.loadCardEdits()
+          db.loadCardEdits(),
+          db.loadDailyStats()
         ]);
         
         setProgress(loadedProgress);
         setLastSession(loadedSession);
         setCardEdits(loadedEdits);
+        if (loadedStats) {
+          setDailyStats(loadedStats);
+        }
       } catch (e) {
         console.error("Failed to load data from IndexedDB", e);
       } finally {
@@ -48,7 +54,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     init();
   }, []);
 
-  // Compute merged cards whenever edits or static data changes (static data is constant, so mostly on edits change)
+  // Compute merged cards whenever edits or static data changes
   const allCards = useMemo(() => {
     const staticCards = adaptCards();
     return staticCards.map(card => {
@@ -70,7 +76,43 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return goodCount >= 1 ? 'mastered' : 'learning';
   }, []);
 
+  const updateDailyStats = useCallback(() => {
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    
+    setDailyStats(prev => {
+      const newStats = { ...prev };
+      
+      // If first time or new day
+      if (newStats.date !== today) {
+        if (newStats.date) {
+          const lastDate = new Date(newStats.date);
+          const currentDate = new Date(today);
+          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+          
+          if (diffDays === 1) {
+             newStats.streak += 1; // Consecutive day
+          } else if (diffDays > 1) {
+             newStats.streak = 1; // Missed a day or more
+          }
+        } else {
+          newStats.streak = 1; // First usage ever
+        }
+        
+        newStats.date = today;
+        newStats.count = 1; // Start count for today
+      } else {
+        newStats.count += 1; // Same day increment
+      }
+      
+      db.saveDailyStats(newStats).catch(e => console.error("Failed to save daily stats", e));
+      return newStats;
+    });
+  }, []);
+
   const applyGrade = useCallback((cardId: string, grade: GradeStatus) => {
+    updateDailyStats(); // Trigger streak/count logic
+
     setProgress(prev => {
       const current = prev[cardId] || { seen: false, goodCount: 0, criticalCount: 0, lastGrade: null, updatedAt: 0, isFlagged: false };
       let newGoodCount = current.goodCount;
@@ -100,7 +142,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         [cardId]: newRecord
       };
     });
-  }, []);
+  }, [updateDailyStats]);
 
   const toggleFlag = useCallback((cardId: string) => {
     setProgress(prev => {
@@ -154,6 +196,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       progress, 
       lastSession, 
       cardEdits,
+      dailyStats,
       applyGrade, 
       toggleFlag, 
       saveCardEdit,

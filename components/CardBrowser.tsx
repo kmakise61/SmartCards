@@ -32,7 +32,8 @@ import {
 } from 'lucide-react';
 
 interface CardBrowserProps {
-  setId: string;
+  setId?: string;
+  deckId?: string; // New prop for broad filtering
   onBack: () => void;
   onStudy: (filters?: SessionFilters) => void;
   isSidebarOpen?: boolean;
@@ -46,6 +47,7 @@ const MarkdownLite: React.FC<{ text: string }> = ({ text }) => {
   const html = text
     .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
     .replace(/_(.*?)_/g, '<em class="text-indigo-500 not-italic">$1</em>')
+    .replace(/{{(.*?)}}/g, '<span class="text-indigo-600 dark:text-indigo-400 font-bold border-b border-indigo-500/30">$1</span>')
     .replace(/\n/g, '<br/>');
   
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
@@ -127,7 +129,7 @@ const GridCard: React.FC<{
   );
 };
 
-export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy, isSidebarOpen = true }) => {
+export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, deckId, onBack, onStudy, isSidebarOpen = true }) => {
   const { allCards, progress, toggleFlag, getCardMastery, lastSession } = useProgress();
   const { settings } = useSettings();
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,8 +144,19 @@ export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy
 
   // Load and prepare data
   const { setCards, setMetadata, stats } = useMemo(() => {
-    const cards = allCards.filter(c => c.setId === setId);
-    const meta = cards.length > 0 ? { name: cards[0].setName, desc: cards[0].setDescription, np: cards[0].np } : { name: 'Unknown Set', desc: '', np: '' };
+    let cards = [];
+    let meta = { name: 'Unknown', desc: '', np: '' };
+
+    if (setId) {
+        cards = allCards.filter(c => c.setId === setId);
+        if (cards.length > 0) {
+            meta = { name: cards[0].setName || 'Set', desc: cards[0].setDescription || '', np: cards[0].np };
+        }
+    } else if (deckId) {
+        // Browse by Category (Deck)
+        cards = allCards.filter(c => c.category === deckId);
+        meta = { name: deckId, desc: `All cards in ${deckId} domain`, np: deckId };
+    }
     
     const s = { total: 0, unseen: 0, learning: 0, mastered: 0 };
     
@@ -161,16 +174,18 @@ export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy
     });
 
     return { setCards: enrichedCards, setMetadata: meta, stats: s };
-  }, [setId, progress, getCardMastery, allCards]);
+  }, [setId, deckId, progress, getCardMastery, allCards]);
 
   // Determine if we can resume a session
   const canResume = useMemo(() => {
-    return (
-      lastSession?.setId === setId && 
-      lastSession.currentIndex > 0 && 
-      lastSession.currentIndex < setCards.length - 1
-    );
-  }, [lastSession, setId, setCards.length]);
+    if (!lastSession) return false;
+    // Resume set
+    if (setId && lastSession.setId === setId && lastSession.currentIndex > 0 && lastSession.currentIndex < setCards.length - 1) return true;
+    // Resume deck (if browsing deck)
+    if (deckId && !setId && lastSession.deckId === deckId && lastSession.currentIndex > 0 && lastSession.currentIndex < setCards.length - 1) return true;
+    
+    return false;
+  }, [lastSession, setId, deckId, setCards.length]);
 
   // Filter and Sort Logic
   const filteredCards = useMemo(() => {
@@ -197,15 +212,18 @@ export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy
   const handleStudyClick = () => {
     if (filterMode !== 'all' || searchTerm) {
       onStudy({ cardIds: filteredCards.map(c => c.id) });
-    } else {
+    } else if (setId) {
       onStudy({ setId });
+    } else if (deckId) {
+      onStudy({ deckId: deckId as any });
     }
   };
 
   const handleResumeClick = () => {
     if (canResume && lastSession) {
       onStudy({ 
-        setId, 
+        setId: lastSession.setId || undefined,
+        deckId: lastSession.deckId || undefined, 
         startIndex: lastSession.currentIndex,
         mastery: lastSession.masteryFilters 
       });
@@ -221,14 +239,16 @@ export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy
   };
 
   const handleRestartClick = () => {
-    onStudy({ setId });
+    if (setId) onStudy({ setId });
+    else if (deckId) onStudy({ deckId: deckId as any });
   };
 
   const handleShufflePlay = () => {
     if (filterMode !== 'all' || searchTerm) {
       onStudy({ cardIds: filteredCards.map(c => c.id), shuffle: true });
     } else {
-      onStudy({ setId, shuffle: true });
+      if (setId) onStudy({ setId, shuffle: true });
+      else if (deckId) onStudy({ deckId: deckId as any, shuffle: true });
     }
     setShowMenu(false);
   };
@@ -245,8 +265,9 @@ export const CardBrowser: React.FC<CardBrowserProps> = ({ setId, onBack, onStudy
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const cleanText = text
-        .replace(/\*\*/g, '')
-        .replace(/_/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '')
+        .replace(/_(.*?)_/g, '')
+        .replace(/{{(.*?)}}/g, '$1') // Read cloze text directly
         .replace(/<[^>]*>/g, ''); 
         
       const utterance = new SpeechSynthesisUtterance(cleanText);

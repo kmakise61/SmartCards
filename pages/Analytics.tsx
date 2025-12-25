@@ -1,9 +1,10 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { DECK_LIST, DECKS } from '../data/deck_config';
-import { SessionFilters } from '../types';
-import { PieChart, TrendingUp, AlertTriangle, CheckCircle2, Circle, Activity, Info, PlayCircle } from 'lucide-react';
+import { SessionFilters, ExamRecord, QuizSessionRecord } from '../types';
+import { PieChart, TrendingUp, AlertTriangle, CheckCircle2, Circle, Activity, Info, PlayCircle, History, Zap, FileCheck } from 'lucide-react';
+import { db } from '../utils/db';
 
 interface DeckStats {
   total: number;
@@ -19,6 +20,13 @@ interface AnalyticsProps {
 
 export const Analytics: React.FC<AnalyticsProps> = ({ onStartSession }) => {
   const { allCards, progress, getCardMastery } = useProgress();
+  const [examHistory, setExamHistory] = useState<ExamRecord[]>([]);
+  const [quizHistory, setQuizHistory] = useState<QuizSessionRecord[]>([]);
+
+  useEffect(() => {
+    db.loadExams().then(recs => setExamHistory(recs.sort((a, b) => b.date - a.date)));
+    db.loadQuizSessions().then(recs => setQuizHistory(recs.sort((a, b) => b.date - a.date)));
+  }, []);
 
   const stats = useMemo(() => {
     let totalSeen = 0;
@@ -72,6 +80,29 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onStartSession }) => {
   }, [allCards, progress, getCardMastery]);
 
   const retentionRate = stats.totalSeen > 0 ? Math.round((stats.totalMastered / stats.totalSeen) * 100) : 0;
+
+  const renderHistoryItem = (type: 'Exam' | 'Quiz', date: number, deckId: string, score: number, items: number) => {
+    const isPass = score >= 75;
+    const colorClass = isPass ? 'text-emerald-500' : 'text-rose-500';
+    return (
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl ${type === 'Exam' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600' : 'bg-[var(--accent-soft)] text-[var(--accent)]'}`}>
+                    {type === 'Exam' ? <FileCheck size={16} /> : <Zap size={16} />}
+                </div>
+                <div>
+                    <div className="font-bold text-slate-700 dark:text-slate-300 text-xs md:text-sm uppercase tracking-wide">{deckId}</div>
+                    <div className="text-[10px] text-slate-400 font-medium">
+                        {new Date(date).toLocaleDateString()} • {items} items
+                    </div>
+                </div>
+            </div>
+            <div className={`text-xl font-black ${colorClass}`}>
+                {score}%
+            </div>
+        </div>
+    );
+  };
 
   return (
     <div className="p-4 md:p-10 max-w-[1500px] mx-auto space-y-10 animate-fade-in pb-24">
@@ -140,6 +171,56 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onStartSession }) => {
             <AlertTriangle size={80} />
           </div>
         </div>
+      </div>
+
+      {/* SESSION HISTORY SPLIT VIEW */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Exam History */}
+          <div className="bg-white dark:bg-darkcard p-8 rounded-[2.5rem] shadow-soft border border-slate-100 dark:border-slate-800 h-[500px] flex flex-col">
+             <div className="flex items-center justify-between mb-6 flex-none">
+                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3">
+                    <FileCheck className="text-indigo-500" /> Board Exams
+                </h3>
+             </div>
+             <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                {examHistory.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                        <History size={48} className="mb-4" />
+                        <p className="text-xs font-bold uppercase tracking-widest">No Exams Taken</p>
+                    </div>
+                ) : (
+                    examHistory.map(exam => (
+                        <div key={exam.id}>
+                            {renderHistoryItem('Exam', exam.date, exam.deckId, exam.score, exam.totalItems)}
+                        </div>
+                    ))
+                )}
+             </div>
+          </div>
+
+          {/* Active Recall History */}
+          <div className="bg-white dark:bg-darkcard p-8 rounded-[2.5rem] shadow-soft border border-slate-100 dark:border-slate-800 h-[500px] flex flex-col">
+             <div className="flex items-center justify-between mb-6 flex-none">
+                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3">
+                    <Zap className="text-[var(--accent)]" /> Active Recall
+                </h3>
+             </div>
+             <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                {quizHistory.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                        <History size={48} className="mb-4" />
+                        <p className="text-xs font-bold uppercase tracking-widest">No Sessions Recorded</p>
+                    </div>
+                ) : (
+                    quizHistory.map(quiz => (
+                        <div key={quiz.id}>
+                            {renderHistoryItem('Quiz', quiz.date, quiz.deckId, quiz.score, quiz.totalItems)}
+                        </div>
+                    ))
+                )}
+             </div>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

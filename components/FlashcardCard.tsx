@@ -65,6 +65,9 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
   const { settings } = useSettings();
   const [isEditOpen, setIsEditOpen] = useState(false);
 
+  // Check for Cloze/Gizmo format
+  const isCloze = card.question.includes('{{');
+
   // Reset scroll on card change
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -86,11 +89,21 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
 
   const handleTTS = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const textToRead = isFlipped ? card.answer + ". " + card.rationale : card.question;
+    let textToRead = isFlipped ? card.answer + ". " + card.rationale : card.question;
+    
+    // For Cloze cards: Front reads question with "Blank". Back reads full sentence then note.
+    if (isCloze) {
+        if (isFlipped) {
+            textToRead = card.question.replace(/{{(.*?)}}/g, '$1') + ". " + card.answer;
+        } else {
+            textToRead = card.question.replace(/{{(.*?)}}/g, 'blank');
+        }
+    }
+
     // Strip common markdown AND HTML tags for clean speech
     const cleanText = textToRead
-      .replace(/\*\*/g, '')
-      .replace(/_/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
       .replace(/<[^>]*>/g, '') // Strip HTML tags
       .replace(/\n/g, ' ');
     
@@ -174,7 +187,11 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
                     ${questionSize} 
                     font-black text-slate-900 dark:text-white leading-tight tracking-tight
                   `}>
-                    <MarkdownText text={card.question} />
+                    {isCloze ? (
+                        <MarkdownText text={card.question.replace(/{{.*?}}/g, '<span class="text-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-0.5 mx-1 rounded-lg opacity-60 inline-block align-middle transform translate-y-[-2px] tracking-widest">[ ... ]</span>')} />
+                    ) : (
+                        <MarkdownText text={card.question} />
+                    )}
                   </h2>
                 </div>
               </div>
@@ -235,9 +252,13 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
               >
                 <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
                   <div>
-                    <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Validated Response</div>
+                    <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{isCloze ? "Complete Thought" : "Validated Response"}</div>
                     <div className={`${answerSize} font-black text-emerald-600 dark:text-emerald-400 leading-tight`}>
-                      <MarkdownText text={card.answer} anchorFirst />
+                      {isCloze ? (
+                          <MarkdownText text={card.question.replace(/{{(.*?)}}/g, '<span class="text-indigo-500 dark:text-indigo-400 border-b-4 border-indigo-500/20">$1</span>')} anchorFirst={false} />
+                      ) : (
+                          <MarkdownText text={card.answer} anchorFirst />
+                      )}
                     </div>
                   </div>
                   
@@ -245,7 +266,12 @@ export const FlashcardCard: React.FC<FlashcardCardProps> = ({
                     <div className="absolute -left-1 top-6 md:top-8 w-1 h-8 md:h-12 bg-emerald-500/50 rounded-r-full" />
                     <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Analysis</div>
                     <div className={`${bodySize} text-slate-600 dark:text-slate-300 font-medium leading-relaxed`}>
-                      <MarkdownText text={card.rationale} anchorFirst />
+                      {isCloze ? (
+                          // For Cloze, the 'answer' field holds the note (since back was mapped to answer)
+                          <MarkdownText text={card.answer} anchorFirst={false} />
+                      ) : (
+                          <MarkdownText text={card.rationale} anchorFirst />
+                      )}
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { FlashcardCard } from '../components/FlashcardCard';
 import { TriageButtons } from '../components/TriageButtons';
 import { DeckGrid } from '../components/DeckGrid';
@@ -24,7 +25,10 @@ import {
   Type, 
   Settings2,
   Target,
-  Eye
+  Eye,
+  MoreVertical,
+  X,
+  History
 } from 'lucide-react';
 
 // Utility to shuffle array (Fisher-Yates)
@@ -92,7 +96,6 @@ export const Flashcards: React.FC<{
   const [elapsed, setElapsed] = useState(0);
 
   // --- DATA LOADING & PREP ---
-  // Use allCards from context (includes edits) instead of static adaptCards()
   const { setsByNp, deckStats, setStats } = useMemo(() => {
     const dStats: Record<string, any> = {};
     const sStats: Record<string, any> = {};
@@ -266,16 +269,6 @@ export const Flashcards: React.FC<{
     setViewMode('browser');
   };
 
-  const handleFilterToggle = (status: MasteryStatus) => {
-    if (isTargetedReview || !selectedSetId) return;
-    const newFilters = selectedMastery.includes(status) 
-      ? selectedMastery.filter(s => s !== status)
-      : [...selectedMastery, status];
-    
-    setSelectedMastery(newFilters);
-    initializeStudySession(selectedSetId, 0, newFilters, undefined, isShuffleOn);
-  };
-
   const toggleShuffle = () => {
     if (!selectedSetId) return;
     const newShuffleState = !isShuffleOn;
@@ -341,7 +334,6 @@ export const Flashcards: React.FC<{
     if (viewMode !== 'study' || isSessionFinished || !currentCard) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent shortcuts if user is typing in a form or editor (e.g. Edit Card Modal)
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' || 
@@ -418,134 +410,125 @@ export const Flashcards: React.FC<{
     );
   }
 
-  // ... (rest of render logic remains same)
   let headerTitle = 'Review';
   if (isTargetedReview) headerTitle = 'Focused Review';
   else if (selectedSetId) headerTitle = setsByNp[selectedDeckId || 'NP1']?.find(s => s.setId === selectedSetId)?.setName || 'Unknown Set';
 
-  return (
+  // Use Portal to render Study Mode directly into body, bypassing any overflow/layout issues in App container
+  return createPortal(
     <div className="fixed inset-0 z-[120] bg-slate-100 dark:bg-darkbg flex flex-col h-[100dvh] overflow-hidden">
       
       {/* HEADER */}
-      <header className="flex-none h-14 bg-white dark:bg-darkcard border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between z-30 shadow-sm relative">
-        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+      <header className="flex-none h-16 bg-white dark:bg-darkcard border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between z-30 shadow-sm relative">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
           <button 
             onClick={handleBack} 
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-500"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-500"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={20} />
           </button>
           
           <div className="flex flex-col min-w-0">
-            <h1 className="text-[10px] sm:text-xs font-black text-slate-900 dark:text-white uppercase tracking-tighter truncate max-w-[120px] sm:max-w-full">
+            <h1 className="text-sm md:text-base font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">
               {headerTitle}
             </h1>
-            <div className="flex items-center gap-2">
-              <span className="text-[7px] sm:text-[8px] font-black text-[var(--accent)] uppercase tracking-widest">{selectedDeckId || 'Custom'}</span>
+            <div className="flex items-center gap-3">
+              <span className="px-1.5 py-0.5 rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[9px] font-black uppercase tracking-widest border border-[var(--accent)]/10">
+                {selectedDeckId || 'Custom'}
+              </span>
               {isShuffleOn && (
-                 <span className="text-[7px] sm:text-[8px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
-                  <Shuffle size={8} /> Mixed
+                 <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1">
+                  <Shuffle size={10} /> Mixed
                 </span>
               )}
-              <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1"><Clock size={8} /> {formatTime(elapsed)}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <Clock size={10} /> {formatTime(elapsed)}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 max-w-[100px] sm:max-w-[200px] md:max-w-md mx-2 md:mx-4">
-          <div className="relative h-1 md:h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+        {/* Progress Center */}
+        <div className="flex-1 max-w-xs mx-4 hidden md:block">
+          <div className="flex justify-between items-end mb-1.5">
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentIndex + 1} / {sessionQueue.length}</span>
+             <span className="text-[10px] font-black text-[var(--accent)]">{studyProgressPercent}%</span>
+          </div>
+          <div className="relative h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div 
-              className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-all duration-700 ease-out" 
+              className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-all duration-500 ease-out shadow-[0_0_10px_rgba(var(--accent-glow),0.5)]" 
               style={{ width: `${studyProgressPercent}%` }} 
             />
           </div>
-          <div className="mt-1 flex justify-between items-center text-[7px] md:text-[9px] font-black text-slate-400 uppercase">
-            <span>{currentIndex + 1}/{sessionQueue.length}</span>
-            <span className="text-[var(--accent)]">{studyProgressPercent}%</span>
-          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* Graded Mode Toggle */}
           <button
             onClick={() => setIsGradedMode(!isGradedMode)}
-            className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
               isGradedMode
-                ? 'bg-indigo-500 text-white shadow-glow'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
             }`}
-            title={isGradedMode ? "Graded Mode: Rate cards to advance" : "Browse Mode: Freely navigate cards"}
           >
-            {isGradedMode ? (
-              <>
-                <Target size={12} /> Graded
-              </>
-            ) : (
-              <>
-                <Eye size={12} /> Browse
-              </>
-            )}
+            {isGradedMode ? <Target size={14} /> : <Eye size={14} />}
+            <span className="hidden sm:inline">{isGradedMode ? 'Graded' : 'Browse'}</span>
           </button>
 
-          {/* Options Menu Trigger */}
+          {/* Options Menu */}
           <div className="relative">
             <button 
               onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`p-2 rounded-xl transition-all ${isSettingsOpen ? 'bg-slate-100 dark:bg-slate-800 text-[var(--accent)]' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              className={`p-2.5 rounded-xl transition-all ${isSettingsOpen ? 'bg-slate-100 dark:bg-slate-800 text-[var(--accent)]' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
             >
               <Settings2 size={20} />
             </button>
 
-            {/* Dropdown Menu */}
             {isSettingsOpen && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-darkcard rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 p-2 animate-in fade-in slide-in-from-top-2 z-50">
-                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Session Options</div>
-                
-                {/* Mobile Toggle inside menu */}
-                <button 
-                  onClick={() => setIsGradedMode(!isGradedMode)}
-                  className="w-full flex sm:hidden items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-300"
-                >
-                  <span className="flex items-center gap-2">
-                    {isGradedMode ? <Target size={14} /> : <Eye size={14} />} 
-                    {isGradedMode ? 'Graded Mode' : 'Browse Mode'}
-                  </span>
-                  <CheckCircle2 size={14} className={isGradedMode ? "text-indigo-500" : "text-slate-200"} />
-                </button>
-
-                <button 
-                  onClick={toggleShuffle}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-300"
-                >
-                  <span className="flex items-center gap-2"><Shuffle size={14} /> Shuffle Cards</span>
-                  {isShuffleOn && <CheckCircle2 size={14} className="text-emerald-500" />}
-                </button>
-                <button 
-                  onClick={() => setIsLargeText(!isLargeText)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-300"
-                >
-                  <span className="flex items-center gap-2"><Type size={14} /> Large Text</span>
-                  {isLargeText && <CheckCircle2 size={14} className="text-emerald-500" />}
-                </button>
-              </div>
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsSettingsOpen(false)} />
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-darkcard rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 p-2 animate-in fade-in slide-in-from-top-2 z-20">
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Session Controls</div>
+                  
+                  <button 
+                    onClick={toggleShuffle}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-300"
+                  >
+                    <span className="flex items-center gap-2"><Shuffle size={14} /> Shuffle Cards</span>
+                    {isShuffleOn && <CheckCircle2 size={14} className="text-emerald-500" />}
+                  </button>
+                  <button 
+                    onClick={() => setIsLargeText(!isLargeText)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-300"
+                  >
+                    <span className="flex items-center gap-2"><Type size={14} /> Large Text</span>
+                    {isLargeText && <CheckCircle2 size={14} className="text-emerald-500" />}
+                  </button>
+                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+                  <button 
+                    onClick={onExit}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-500 transition-colors text-xs font-bold"
+                  >
+                    <X size={14} /> End Session
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
       </header>
 
-      {/* OVERLAY for Settings */}
-      {isSettingsOpen && <div className="fixed inset-0 z-20 bg-transparent" onClick={() => setIsSettingsOpen(false)} />}
-
-      <main className="flex-1 min-h-0 relative flex flex-col items-center justify-center p-2 sm:p-4 md:p-10 bg-slate-100/50 dark:bg-darkbg/50">
+      <main className="flex-1 min-h-0 relative flex flex-col items-center justify-center p-2 sm:p-4 md:p-8 bg-slate-100/50 dark:bg-darkbg/50">
         
         {/* FEEDBACK TOAST */}
         {showFeedback && (
-          <div className={`absolute top-4 z-[100] px-6 py-2 rounded-full font-black text-[10px] md:text-xs text-white shadow-2xl animate-in zoom-in slide-in-from-top-2 duration-300 ${showFeedback.color} border-2 border-white/20`}>
+          <div className={`absolute top-4 z-[100] px-6 py-2 rounded-full font-black text-[10px] md:text-xs text-white shadow-xl shadow-black/10 animate-in zoom-in slide-in-from-top-2 duration-300 ${showFeedback.color}`}>
             {showFeedback.msg}
           </div>
         )}
 
-        <div className="w-full h-full max-w-5xl min-h-0 flex flex-col items-center justify-center relative">
+        <div className="w-full h-full max-w-6xl min-h-0 flex flex-col items-center justify-center relative">
           
           {/* NAVIGATION ARROWS (Desktop) */}
           {!isSessionFinished && !isGradedMode && (
@@ -553,16 +536,16 @@ export const Flashcards: React.FC<{
               <button 
                 onClick={() => currentIndex > 0 && setCurrentIndex(prev => prev - 1)}
                 disabled={currentIndex === 0}
-                className="hidden md:flex absolute left-[-3rem] lg:left-[-4.5rem] top-1/2 -translate-y-1/2 p-4 rounded-full bg-white dark:bg-slate-800 text-slate-400 hover:text-[var(--accent)] shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-0 touch-manipulation z-10"
+                className="hidden xl:flex absolute left-[-5rem] top-1/2 -translate-y-1/2 p-4 rounded-full bg-white dark:bg-slate-800 text-slate-400 hover:text-[var(--accent)] shadow-xl hover:scale-110 active:scale-95 transition-all disabled:opacity-0 touch-manipulation z-10"
               >
-                <ArrowLeft size={28} />
+                <ArrowLeft size={24} strokeWidth={3} />
               </button>
               <button 
                 onClick={() => currentIndex < sessionQueue.length - 1 && setCurrentIndex(prev => prev + 1)}
                 disabled={currentIndex === sessionQueue.length - 1}
-                className="hidden md:flex absolute right-[-3rem] lg:right-[-4.5rem] top-1/2 -translate-y-1/2 p-4 rounded-full bg-white dark:bg-slate-800 text-slate-400 hover:text-[var(--accent)] shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-0 touch-manipulation z-10"
+                className="hidden xl:flex absolute right-[-5rem] top-1/2 -translate-y-1/2 p-4 rounded-full bg-white dark:bg-slate-800 text-slate-400 hover:text-[var(--accent)] shadow-xl hover:scale-110 active:scale-95 transition-all disabled:opacity-0 touch-manipulation z-10"
               >
-                <ArrowRight size={28} />
+                <ArrowRight size={24} strokeWidth={3} />
               </button>
             </>
           )}
@@ -574,7 +557,7 @@ export const Flashcards: React.FC<{
               
               {/* LEFT: RESULTS */}
               <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-slate-100 dark:border-slate-800">
-                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-8">Amazing! You're almost there.</h2>
+                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-8">Session Complete</h2>
                  
                  <div className="flex items-center gap-8 mb-8 w-full max-w-sm">
                     {/* Donut Chart Simulation with SVG */}
@@ -609,20 +592,39 @@ export const Flashcards: React.FC<{
 
               {/* RIGHT: NEXT STEPS */}
               <div className="flex-1 p-8 md:p-12 bg-slate-50/50 dark:bg-black/20 flex flex-col justify-center">
-                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Next steps</h3>
+                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Recommended Actions</h3>
                  
                  <div className="space-y-4">
+                    {/* INSTANT REPLAY FEATURE */}
                     {learningCount > 0 && (
-                      <button 
-                        onClick={() => {
-                           const againIds = Object.keys(sessionResults).filter(id => sessionResults[id] === 'again');
-                           initializeStudySession(null, 0, undefined, againIds);
-                        }}
-                        className="w-full py-5 px-6 bg-[var(--accent)] text-white font-black rounded-2xl shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-between group"
+                      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all hover:shadow-md hover:border-amber-200 dark:hover:border-amber-800"
+                           onClick={() => {
+                               const againIds = Object.keys(sessionResults).filter(id => sessionResults[id] === 'again');
+                               initializeStudySession(null, 0, undefined, againIds, true); // Shuffle for rapid fire
+                           }}
                       >
-                         <span className="uppercase tracking-widest text-xs">Focus on {learningCount} Still learning cards</span>
-                         <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
+                         <div className="absolute right-0 top-0 p-3 opacity-10 text-amber-600 group-hover:scale-110 transition-transform">
+                            <RotateCcw size={60} />
+                         </div>
+                         
+                         <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2">
+                               <div className="p-1.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-lg">
+                                  <Zap size={16} className="fill-current" />
+                               </div>
+                               <span className="text-xs font-black text-amber-700 dark:text-amber-500 uppercase tracking-widest">Instant Replay</span>
+                            </div>
+                            <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-1">
+                               Audit {learningCount} Mistakes
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+                               Close the feedback loop while the concepts are fresh.
+                            </p>
+                            <button className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 flex items-center gap-2 group-hover:gap-3 transition-all">
+                               Start Audit <ArrowRight size={12} />
+                            </button>
+                         </div>
+                      </div>
                     )}
 
                     <button 
@@ -633,10 +635,10 @@ export const Flashcards: React.FC<{
                              initializeStudySession(selectedSetId, 0);
                           }
                        }}
-                       className="w-full py-5 px-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all flex items-center justify-center gap-3 group"
+                       className="w-full py-4 px-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl hover:border-slate-300 dark:hover:border-slate-600 transition-all flex items-center justify-center gap-3 group"
                     >
                        <RotateCcw size={16} className="group-hover:-rotate-90 transition-transform duration-500" />
-                       <span className="uppercase tracking-widest text-xs">Restart Flashcards</span>
+                       <span className="uppercase tracking-widest text-xs">Restart Full Session</span>
                     </button>
                  </div>
               </div>
@@ -661,16 +663,16 @@ export const Flashcards: React.FC<{
                 />
               </div>
               
-              <div className="flex-none h-16 sm:h-20 md:h-24 flex items-center justify-center w-full max-w-3xl mx-auto px-1">
+              <div className="flex-none h-20 md:h-24 flex items-center justify-center w-full max-w-3xl mx-auto px-1">
                 {isFlipped ? (
                   isGradedMode ? (
                     // GRADED MODE (Back): Show Triage Buttons or Next if rated
                     isRated && !settings.autoAdvance ? (
                       <button 
                         onClick={goToNextCard}
-                        className="w-full h-full bg-emerald-600 text-white font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-[0.2em] rounded-2xl shadow-glow flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2"
+                        className="w-full h-full bg-emerald-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-3xl shadow-glow flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 hover:scale-[1.02] active:scale-95 transition-all"
                       >
-                        NEXT MODULE <ArrowRight size={18} />
+                        NEXT <ArrowRight size={20} strokeWidth={3} />
                       </button>
                     ) : (
                       <div className="w-full h-full animate-in slide-in-from-bottom-2 duration-300 pb-1">
@@ -679,59 +681,59 @@ export const Flashcards: React.FC<{
                     )
                   ) : (
                     // BROWSE MODE (Back): Show Navigation Controls
-                    <div className="w-full flex items-center gap-2 md:gap-4 h-full pb-1">
+                    <div className="w-full flex items-center gap-3 h-full pb-1">
                       <button 
                         onClick={() => currentIndex > 0 && setCurrentIndex(prev => prev - 1)} 
                         disabled={currentIndex === 0}
-                        className="md:hidden h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation"
+                        className="h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation hover:border-slate-300 dark:hover:border-slate-700"
                       >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={24} />
                       </button>
 
                       <button 
                         onClick={goToNextCard}
-                        className="flex-1 h-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-3 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                        className="flex-1 h-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-black text-sm uppercase tracking-[0.2em] rounded-3xl flex items-center justify-center gap-3 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all active:scale-95 shadow-sm"
                       >
-                        NEXT CARD <ArrowRight size={16} />
+                        Next Card <ArrowRight size={18} />
                       </button>
 
                       <button 
                         onClick={() => currentIndex < sessionQueue.length - 1 && setCurrentIndex(prev => prev + 1)} 
                         disabled={currentIndex === sessionQueue.length - 1}
-                        className="md:hidden h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation"
+                        className="h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation hover:border-slate-300 dark:hover:border-slate-700"
                       >
-                        <ArrowRight size={20} />
+                        <ArrowRight size={24} />
                       </button>
                     </div>
                   )
                 ) : (
                   // FRONT OF CARD
-                  <div className="w-full flex items-center gap-2 md:gap-4 h-full pb-1">
+                  <div className="w-full flex items-center gap-3 h-full pb-1">
                     {!isGradedMode && (
                       <button 
                         onClick={() => currentIndex > 0 && setCurrentIndex(prev => prev - 1)} 
                         disabled={currentIndex === 0}
-                        className="md:hidden h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation"
+                        className="h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation hover:border-slate-300 dark:hover:border-slate-700"
                       >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={24} />
                       </button>
                     )}
 
                     <button 
                       onClick={() => setIsFlipped(true)} 
-                      className="flex-1 h-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-[0.1em] sm:tracking-[0.2em] rounded-2xl shadow-glow flex items-center justify-center gap-2 sm:gap-3 hover:brightness-110 active:scale-[0.98] transition-all group touch-manipulation"
+                      className="flex-1 h-full bg-gradient-to-r from-[var(--accent)] to-rose-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-3xl shadow-glow flex items-center justify-center gap-3 hover:brightness-110 active:scale-[0.98] transition-all group touch-manipulation"
                     >
-                      <Zap size={18} fill="currentColor" className="group-hover:scale-110 transition-transform" /> 
-                      <span>REVEAL ANALYSIS</span>
+                      <Zap size={20} fill="currentColor" className="group-hover:scale-110 transition-transform" /> 
+                      <span>Reveal</span>
                     </button>
 
                     {!isGradedMode && (
                       <button 
                         onClick={() => currentIndex < sessionQueue.length - 1 && setCurrentIndex(prev => prev + 1)} 
                         disabled={currentIndex === sessionQueue.length - 1}
-                        className="md:hidden h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation"
+                        className="h-full aspect-square flex items-center justify-center bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-400 disabled:opacity-20 active:scale-95 transition-all shadow-sm touch-manipulation hover:border-slate-300 dark:hover:border-slate-700"
                       >
-                        <ArrowRight size={20} />
+                        <ArrowRight size={24} />
                       </button>
                     )}
                   </div>
@@ -753,6 +755,7 @@ export const Flashcards: React.FC<{
           )}
         </div>
       </main>
-    </div>
+    </div>,
+    document.body
   );
 };

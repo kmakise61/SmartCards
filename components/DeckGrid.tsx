@@ -13,6 +13,9 @@ interface DeckGridProps {
 export const DeckGrid: React.FC<DeckGridProps> = ({ deckStats, onStartDeck, onViewDeck }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Filter to only show decks meant for the dashboard
+  const visibleDecks = DECK_LIST.filter(d => d.visibility.includes('dashboard'));
+
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-8 lg:p-12 space-y-8 md:space-y-12 animate-fade-in pb-32 relative">
       {/* Ambient background blobs for glassmorphism */}
@@ -59,7 +62,7 @@ export const DeckGrid: React.FC<DeckGridProps> = ({ deckStats, onStartDeck, onVi
         ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8"
         : "flex flex-col gap-4"
       }>
-        {DECK_LIST.map(deck => (
+        {visibleDecks.map(deck => (
           <DeckCard 
             key={deck.id} 
             deck={deck} 

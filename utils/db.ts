@@ -1,13 +1,15 @@
 
-import { MasteryRecord, UserSettings, LastSessionState, ExamRecord, CardEdit } from '../types';
+import { MasteryRecord, UserSettings, LastSessionState, ExamRecord, CardEdit, DailyStats, QuizSessionRecord } from '../types';
 
 const DB_NAME = 'pnle_smartcards_db';
-const DB_VERSION = 6; // Incremented for card_edits
+const DB_VERSION = 8; // Incremented for quiz_sessions
 const STORE_PROGRESS = 'progress';
 const STORE_SETTINGS = 'settings';
 const STORE_SESSION = 'session';
 const STORE_EXAMS = 'exams';
+const STORE_QUIZ_SESSIONS = 'quiz_sessions'; // New store
 const STORE_EDITS = 'card_edits';
+const STORE_STATS = 'user_stats';
 
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -41,8 +43,16 @@ const openDB = (): Promise<IDBDatabase> => {
         db.createObjectStore(STORE_EXAMS, { keyPath: 'id' });
       }
 
+      if (!db.objectStoreNames.contains(STORE_QUIZ_SESSIONS)) {
+        db.createObjectStore(STORE_QUIZ_SESSIONS, { keyPath: 'id' });
+      }
+
       if (!db.objectStoreNames.contains(STORE_EDITS)) {
         db.createObjectStore(STORE_EDITS, { keyPath: 'id' });
+      }
+
+      if (!db.objectStoreNames.contains(STORE_STATS)) {
+        db.createObjectStore(STORE_STATS, { keyPath: 'id' });
       }
     };
   });
@@ -157,6 +167,31 @@ export const db = {
     });
   },
 
+  // --- QUIZ SESSIONS (NEW) ---
+  async loadQuizSessions(): Promise<QuizSessionRecord[]> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_QUIZ_SESSIONS, 'readonly');
+      const store = transaction.objectStore(STORE_QUIZ_SESSIONS);
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  async saveQuizSession(record: QuizSessionRecord): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_QUIZ_SESSIONS, 'readwrite');
+      const store = transaction.objectStore(STORE_QUIZ_SESSIONS);
+      const request = store.put(record);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  },
+
   // --- CARD EDITS ---
   async loadCardEdits(): Promise<Record<string, CardEdit>> {
     const db = await openDB();
@@ -201,29 +236,58 @@ export const db = {
     });
   },
 
+  // --- DAILY STATS (NEW) ---
+  async loadDailyStats(): Promise<DailyStats | null> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_STATS, 'readonly');
+      const store = transaction.objectStore(STORE_STATS);
+      const request = store.get('daily_stats');
+
+      request.onsuccess = () => resolve(request.result ? request.result.value : null);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  async saveDailyStats(stats: DailyStats): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_STATS, 'readwrite');
+      const store = transaction.objectStore(STORE_STATS);
+      const request = store.put({ id: 'daily_stats', value: stats });
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  },
+
   // --- BACKUP & RESTORE ---
   async exportBackup(): Promise<string> {
     const db = await openDB();
     return new Promise(async (resolve, reject) => {
         try {
-            const tx = db.transaction([STORE_PROGRESS, STORE_SETTINGS, STORE_SESSION, STORE_EXAMS, STORE_EDITS], 'readonly');
+            const tx = db.transaction([STORE_PROGRESS, STORE_SETTINGS, STORE_SESSION, STORE_EXAMS, STORE_QUIZ_SESSIONS, STORE_EDITS, STORE_STATS], 'readonly');
             
             const progressReq = tx.objectStore(STORE_PROGRESS).getAll();
             const settingsReq = tx.objectStore(STORE_SETTINGS).get('user_settings');
             const sessionReq = tx.objectStore(STORE_SESSION).get('last_session');
             const examsReq = tx.objectStore(STORE_EXAMS).getAll();
+            const quizReq = tx.objectStore(STORE_QUIZ_SESSIONS).getAll();
             const editsReq = tx.objectStore(STORE_EDITS).getAll();
+            const statsReq = tx.objectStore(STORE_STATS).get('daily_stats');
 
             const progress = await new Promise((res) => { progressReq.onsuccess = () => res(progressReq.result) });
             const settings = await new Promise((res) => { settingsReq.onsuccess = () => res(settingsReq.result?.value) });
             const session = await new Promise((res) => { sessionReq.onsuccess = () => res(sessionReq.result?.value) });
             const exams = await new Promise((res) => { examsReq.onsuccess = () => res(examsReq.result) });
+            const quizzes = await new Promise((res) => { quizReq.onsuccess = () => res(quizReq.result) });
             const edits = await new Promise((res) => { editsReq.onsuccess = () => res(editsReq.result) });
+            const stats = await new Promise((res) => { statsReq.onsuccess = () => res(statsReq.result?.value) });
 
             const backup = {
                 timestamp: Date.now(),
-                version: 6,
-                data: { progress, settings, session, exams, edits }
+                version: 8,
+                data: { progress, settings, session, exams, quizzes, edits, stats }
             };
             resolve(JSON.stringify(backup, null, 2));
         } catch(e) { reject(e); }
@@ -239,13 +303,15 @@ export const db = {
           throw new Error("Invalid backup file format");
         }
 
-        const tx = db.transaction([STORE_PROGRESS, STORE_SETTINGS, STORE_SESSION, STORE_EXAMS, STORE_EDITS], 'readwrite');
+        const tx = db.transaction([STORE_PROGRESS, STORE_SETTINGS, STORE_SESSION, STORE_EXAMS, STORE_QUIZ_SESSIONS, STORE_EDITS, STORE_STATS], 'readwrite');
         
         tx.objectStore(STORE_PROGRESS).clear();
         tx.objectStore(STORE_SETTINGS).clear();
         tx.objectStore(STORE_SESSION).clear();
         tx.objectStore(STORE_EXAMS).clear();
+        tx.objectStore(STORE_QUIZ_SESSIONS).clear();
         tx.objectStore(STORE_EDITS).clear();
+        tx.objectStore(STORE_STATS).clear();
 
         const pStore = tx.objectStore(STORE_PROGRESS);
         if (Array.isArray(parsed.data.progress)) {
@@ -265,9 +331,18 @@ export const db = {
            parsed.data.exams.forEach((item: any) => eStore.put(item));
         }
 
+        const qStore = tx.objectStore(STORE_QUIZ_SESSIONS);
+        if (parsed.data.quizzes && Array.isArray(parsed.data.quizzes)) {
+           parsed.data.quizzes.forEach((item: any) => qStore.put(item));
+        }
+
         const editsStore = tx.objectStore(STORE_EDITS);
         if (parsed.data.edits && Array.isArray(parsed.data.edits)) {
            parsed.data.edits.forEach((item: any) => editsStore.put(item));
+        }
+
+        if (parsed.data.stats) {
+           tx.objectStore(STORE_STATS).put({ id: 'daily_stats', value: parsed.data.stats });
         }
 
         tx.oncomplete = () => resolve(true);
@@ -283,11 +358,13 @@ export const db = {
   async clearProgress(): Promise<void> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_PROGRESS, STORE_SESSION, STORE_EXAMS], 'readwrite');
+      const transaction = db.transaction([STORE_PROGRESS, STORE_SESSION, STORE_EXAMS, STORE_QUIZ_SESSIONS, STORE_STATS], 'readwrite');
       
       transaction.objectStore(STORE_PROGRESS).clear();
       transaction.objectStore(STORE_SESSION).clear();
       transaction.objectStore(STORE_EXAMS).clear();
+      transaction.objectStore(STORE_QUIZ_SESSIONS).clear();
+      transaction.objectStore(STORE_STATS).clear();
       // NOTE: We do NOT clear edits on "Clear Progress". Edits are considered content customization.
 
       transaction.oncomplete = () => resolve();

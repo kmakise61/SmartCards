@@ -4,6 +4,8 @@ import { MasteryStatus, DeckConfig, SessionFilters } from '../types';
 import { DECK_LIST } from '../data/deck_config';
 import { useProgress } from '../context/ProgressContext';
 import { useSettings } from '../context/SettingsContext';
+import { ExamCountdown } from '../components/ExamCountdown';
+import { DailyGoalWidget } from '../components/DailyGoalWidget';
 import { 
   Activity, 
   ShieldCheck, 
@@ -27,6 +29,7 @@ interface DashboardProps {
   onStartSession: (filters?: SessionFilters, resume?: boolean) => void;
   onOpenCustomSession?: () => void;
   onOpenSearch?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const calculateDashboardStats = (
@@ -36,12 +39,16 @@ const calculateDashboardStats = (
 ) => {
   const metrics: Record<string, { total: number; unseen: number; learning: number; mastered: number; progress: number }> = {};
   
-  DECK_LIST.forEach(d => {
+  // Only include decks visible in the dashboard
+  const visibleDecks = DECK_LIST.filter(d => d.visibility.includes('dashboard'));
+
+  visibleDecks.forEach(d => {
     metrics[d.id] = { total: 0, unseen: 0, learning: 0, mastered: 0, progress: 0 };
   });
 
   allCards.forEach(card => {
     const deckId = card.category;
+    // Only process if this deck is part of the dashboard metrics
     if (metrics[deckId]) {
       metrics[deckId].total++;
       const record = progress[card.id];
@@ -60,17 +67,20 @@ const calculateDashboardStats = (
   let seenCount = 0;
   let learningCount = 0;
 
+  // Re-iterate to calculate totals specifically for visible dashboard decks
   allCards.forEach(card => {
-    totalCards++;
-    const record = progress[card.id];
-    if (record?.seen) {
-      seenCount++;
-      const status = getCardMastery(true, record.goodCount);
-      if (status === 'mastered') {
-        masteredCount++;
-      } else if (status === 'learning') {
-        learningCount++;
-      }
+    if (metrics[card.category]) { // Only count if deck is visible
+        totalCards++;
+        const record = progress[card.id];
+        if (record?.seen) {
+          seenCount++;
+          const status = getCardMastery(true, record.goodCount);
+          if (status === 'mastered') {
+            masteredCount++;
+          } else if (status === 'learning') {
+            learningCount++;
+          }
+        }
     }
   });
 
@@ -83,11 +93,11 @@ const calculateDashboardStats = (
   else if (overallMastery > 30) rank = "Competent";
   else if (overallMastery > 10) rank = "Adv. Beginner";
 
-  const lowestCoreDeckId = DECK_LIST.reduce((prev, curr) => {
+  const lowestCoreDeckId = visibleDecks.reduce((prev, curr) => {
     const prevProg = metrics[prev.id]?.progress || 0;
     const currProg = metrics[curr.id]?.progress || 0;
     return currProg < prevProg ? curr : prev;
-  }, DECK_LIST[0]);
+  }, visibleDecks[0]);
 
   return { 
     metrics, 
@@ -102,7 +112,7 @@ const calculateDashboardStats = (
   };
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCustomSession, onOpenSearch }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCustomSession, onOpenSearch, onOpenSettings }) => {
   const { allCards, progress, getCardMastery, lastSession } = useProgress();
   const { settings, updateSettings } = useSettings();
   const [greeting, setGreeting] = useState('Welcome');
@@ -115,14 +125,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
     else setGreeting('Good Evening');
   }, []);
   
-  // Use allCards from context (includes edits) instead of static adaptCards()
   const stats = useMemo(() => 
     calculateDashboardStats(allCards, progress, getCardMastery), 
     [allCards, progress, getCardMastery]
   );
 
   const sortedDecks = useMemo(() => {
-    const list = [...DECK_LIST];
+    // Only show visible decks
+    const list = DECK_LIST.filter(d => d.visibility.includes('dashboard'));
     if (settings.sortByLowest) {
       list.sort((a, b) => (stats.metrics[a.id]?.progress || 0) - (stats.metrics[b.id]?.progress || 0));
     }
@@ -131,6 +141,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
 
   const handleStatusClick = (status: MasteryStatus) => {
     const targetIds = allCards.filter(c => {
+       // Filter by deck visibility first
+       const isVisible = DECK_LIST.find(d => d.id === c.category)?.visibility.includes('dashboard');
+       if (!isVisible) return false;
+
        const record = progress[c.id];
        return getCardMastery(!!record?.seen, record?.goodCount || 0) === status;
     }).map(c => c.id);
@@ -203,8 +217,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-24 relative overflow-hidden">
-      {/* Background Ambience */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--accent-soft),_transparent_50%)] pointer-events-none opacity-40 mix-blend-screen" />
+      {/* Background Ambience - Light Mode Only to preserve Dark Mode Deep Space */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--accent-soft),_transparent_50%)] pointer-events-none opacity-40 mix-blend-screen dark:hidden" />
 
       {/* --- GRID LAYOUT START --- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative z-10">
@@ -316,6 +330,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
         {/* === RIGHT COLUMN (Stats & Strategy) === */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
           
+          {/* EXAM COUNTDOWN WIDGET */}
+          <ExamCountdown onSetDate={() => onOpenSettings?.()} />
+
+          {/* DAILY GOAL WIDGET */}
+          <DailyGoalWidget />
+
           {/* 3. MASTERY WIDGET */}
           <div className="bg-white/80 dark:bg-darkcard/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-200/60 dark:border-white/5 shadow-soft relative overflow-hidden group">
              <div className="relative z-10 flex flex-col items-center text-center space-y-8">
@@ -384,7 +404,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
           {/* 4. CLINICAL PROTOCOL CARD (Fully Responsive) */}
           <div className="relative overflow-hidden rounded-[2.5rem] p-8 border transition-all duration-300
             bg-white border-indigo-100 shadow-sm
-            dark:bg-darkcard dark:border-indigo-500/20 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
+            dark:bg-darkcard/60 dark:border-indigo-500/20 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
           ">
               {/* Light Mode Glow Effect (Subtle) */}
               <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none opacity-60 dark:hidden" />

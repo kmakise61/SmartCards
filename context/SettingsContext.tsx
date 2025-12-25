@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   voiceURI: undefined,
   speechRate: 1.1,
   speechPitch: 1.0,
+  targetExamDate: undefined,
+  dailyGoal: 50, // Default 50 cards
 };
 
 const SOFT_MODE_ACCENT = '#0D9488'; // Teal-600

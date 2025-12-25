@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { Dashboard } from './pages/Dashboard';
 import { Flashcards } from './pages/Flashcards';
 import { Analytics } from './pages/Analytics';
+import { QuizMode } from './pages/QuizMode'; // Import QuizMode
 import { ViewState, SessionFilters } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider, useProgress } from './context/ProgressContext';
-import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool, SmartphoneIcon as DownloadIcon, WifiOff } from 'lucide-react';
+import { X, Check, LayoutDashboard, WalletCards, BarChart2, Download, Upload, AlertCircle, Share2, HelpCircle, Cloud, Monitor, Smartphone, Volume2, Mic, Trash2, AlertTriangle, Palette, Plus, ChevronRight, RefreshCw, ArrowRight, PenTool, SmartphoneIcon as DownloadIcon, WifiOff, Calendar, Target, Keyboard } from 'lucide-react';
 import { db } from './utils/db';
 import { CustomSessionModal } from './components/CustomSessionModal';
 import { GlobalSearch } from './components/GlobalSearch';
@@ -295,6 +297,49 @@ const SettingsDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                 </button>
               </section>
             )}
+
+            {/* Exam Target Date */}
+            <section>
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Exam Prep</h3>
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-4">
+                
+                {/* Target Date */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Target Exam Date</label>
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-[var(--accent)]" />
+                    <input 
+                      type="date"
+                      className="bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none w-full appearance-none"
+                      value={settings.targetExamDate ? new Date(settings.targetExamDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? new Date(e.target.value).getTime() : undefined;
+                        updateSettings({ targetExamDate: date });
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Daily Goal */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Daily Card Goal</label>
+                  <div className="flex items-center gap-4">
+                    <Target size={18} className="text-emerald-500" />
+                    <input 
+                      type="range"
+                      min="10"
+                      max="200"
+                      step="10"
+                      value={settings.dailyGoal}
+                      onChange={(e) => updateSettings({ dailyGoal: parseInt(e.target.value) })}
+                      className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                    <span className="text-sm font-bold text-slate-900 dark:text-white w-8 text-right">{settings.dailyGoal}</span>
+                  </div>
+                </div>
+
+              </div>
+            </section>
 
             {/* Appearance Section */}
             <section>
@@ -589,7 +634,8 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-gray-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden relative">
+    // Updated container: bg-transparent to allow body gradient to show, no double scrollbars
+    <div className="h-screen flex flex-col md:flex-row bg-transparent text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden relative">
       
       {/* OFFLINE INDICATOR */}
       {!isOnline && (
@@ -616,18 +662,23 @@ const MainContent: React.FC = () => {
           onOpenSearch={() => setIsSearchOpen(true)}
         />
 
-        <main className="flex-1 min-h-0 overflow-hidden relative">
+        <main className="flex-1 min-h-0 overflow-hidden relative z-10 pb-20 md:pb-0">
           {currentView === 'dashboard' ? (
             <div className="h-full overflow-y-auto">
               <Dashboard 
                 onStartSession={startSession} 
                 onOpenCustomSession={() => setIsCustomSessionOpen(true)}
                 onOpenSearch={() => setIsSearchOpen(true)}
+                onOpenSettings={() => setIsSettingsOpen(true)}
               />
             </div>
           ) : currentView === 'analytics' ? (
             <div className="h-full overflow-y-auto">
               <Analytics onStartSession={startSession} />
+            </div>
+          ) : currentView === 'quiz' ? (
+            <div className="h-full overflow-y-auto">
+              <QuizMode onExit={() => handleViewChange('dashboard')} />
             </div>
           ) : (
             <Flashcards 
@@ -657,6 +708,13 @@ const MainContent: React.FC = () => {
           >
             <WalletCards size={20} />
             <span className="text-[9px] font-black uppercase tracking-widest">Cards</span>
+          </button>
+          <button 
+            onClick={() => handleViewChange('quiz')}
+            className={`flex flex-col items-center gap-1 transition-all ${currentView === 'quiz' ? 'text-[var(--accent)] scale-110' : 'text-slate-400'}`}
+          >
+            <Keyboard size={20} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Recall</span>
           </button>
           <button 
             onClick={() => handleViewChange('analytics')}

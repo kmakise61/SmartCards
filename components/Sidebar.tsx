@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ViewState } from '../types';
-import { LayoutDashboard, WalletCards, Settings, HeartPulse, ChevronRight, ChevronLeft, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, WalletCards, Settings, HeartPulse, ChevronRight, ChevronLeft, BarChart2, Keyboard, Zap } from 'lucide-react';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -21,11 +21,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'flashcards', label: 'Flashcards', icon: WalletCards },
+    { id: 'quiz', label: 'Active Recall', icon: Zap },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
   ];
 
   return (
-    <aside className={`fixed left-0 top-0 h-full bg-white/80 dark:bg-darkcard/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col z-50 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`fixed left-0 top-0 h-full bg-white/80 dark:bg-slate-950/60 backdrop-blur-2xl border-r border-slate-200 dark:border-white/5 hidden md:flex flex-col z-50 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
       {/* Brand */}
       <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'px-6 gap-3'}`}>
         <div className="w-8 h-8 bg-[var(--accent)] rounded-lg flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-[var(--accent)]/30">
@@ -50,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 group w-full flex items-center h-12 rounded-xl transition-all duration-200
                 ${isActive 
                   ? 'bg-[var(--accent-soft)] text-[var(--accent)]' 
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}
                 ${isCollapsed ? 'justify-center px-0' : 'px-4 space-x-3'}
               `}
             >
@@ -70,11 +71,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer Actions */}
-      <div className="p-3 mt-auto border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+      <div className="p-3 mt-auto border-t border-slate-100 dark:border-white/5 flex flex-col gap-2">
         <button 
           onClick={onOpenSettings}
           title={isCollapsed ? 'Settings' : undefined}
-          className={`flex items-center h-12 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full ${isCollapsed ? 'justify-center' : 'px-4 space-x-3'}`}
+          className={`flex items-center h-12 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-all w-full ${isCollapsed ? 'justify-center' : 'px-4 space-x-3'}`}
         >
            <Settings size={20} className="flex-shrink-0" />
            {!isCollapsed && <span className="font-bold text-sm">Settings</span>}
