@@ -26,6 +26,8 @@ import { PHARM_LABS_SET2 } from './supplementals_flashcards/pharm_labs_set2';
 import { PRIO_DEL_SET1 } from './supplementals_flashcards/prio_del_set1';
 import { PRIO_DEL_SET2 } from './supplementals_flashcards/prio_del_set2';
 import { MEDSURG_SIGNS_SET1 } from './medsurg_signs_flashcards/medsurg_signs_set1';
+import { MNEMONICS_SET1 } from './supplementals_flashcards/mnemonics_set1';
+import { TRIADS_SYNDROMES_SET1 } from './supplementals_flashcards/triads_syndromes_set1';
 
 // Exporting the High Yield NP Sets available in the preview
 export const SEEDED_CARDS: Flashcard[] = [
@@ -54,5 +56,7 @@ export const SEEDED_CARDS: Flashcard[] = [
     ...(PHARM_LABS_SET2 || []),
     ...(PRIO_DEL_SET1 || []),
     ...(PRIO_DEL_SET2 || []),
-    ...(MEDSURG_SIGNS_SET1 || [])
+    ...(MEDSURG_SIGNS_SET1 || []),
+    ...(MNEMONICS_SET1 || []),
+    ...(TRIADS_SYNDROMES_SET1 || [])
 ];

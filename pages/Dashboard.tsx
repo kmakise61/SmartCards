@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { MasteryStatus, DeckConfig, SessionFilters } from '../types';
+import { MasteryStatus, DeckConfig, SessionFilters, DeckId } from '../types';
 import { DECK_LIST } from '../data/deck_config';
 import { useProgress } from '../context/ProgressContext';
 import { useSettings } from '../context/SettingsContext';
@@ -22,7 +22,10 @@ import {
   Target,
   PlusCircle,
   Search,
-  BookOpen
+  BookOpen,
+  Keyboard,
+  Sparkles,
+  Command
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -30,6 +33,7 @@ interface DashboardProps {
   onOpenCustomSession?: () => void;
   onOpenSearch?: () => void;
   onOpenSettings?: () => void;
+  onOpenQuiz?: (deckId: string, phase?: 'setup' | 'active' | 'browser') => void;
 }
 
 const calculateDashboardStats = (
@@ -38,22 +42,32 @@ const calculateDashboardStats = (
   getCardMastery: (seen: boolean, goodCount: number) => MasteryStatus
 ) => {
   const metrics: Record<string, { total: number; unseen: number; learning: number; mastered: number; progress: number }> = {};
+  const quizMetrics: Record<string, { total: number; unseen: number; learning: number; mastered: number; progress: number }> = {};
   
-  // Only include decks visible in the dashboard
   const visibleDecks = DECK_LIST.filter(d => d.visibility.includes('dashboard'));
+  const quizDecks = DECK_LIST.filter(d => d.visibility.includes('quiz'));
 
   visibleDecks.forEach(d => {
     metrics[d.id] = { total: 0, unseen: 0, learning: 0, mastered: 0, progress: 0 };
   });
 
+  quizDecks.forEach(d => {
+    quizMetrics[d.id] = { total: 0, unseen: 0, learning: 0, mastered: 0, progress: 0 };
+  });
+
   allCards.forEach(card => {
     const deckId = card.category;
-    // Only process if this deck is part of the dashboard metrics
     if (metrics[deckId]) {
       metrics[deckId].total++;
       const record = progress[card.id];
       const status = getCardMastery(!!record?.seen, record?.goodCount || 0);
       metrics[deckId][status]++;
+    }
+    if (quizMetrics[deckId]) {
+      quizMetrics[deckId].total++;
+      const record = progress[card.id];
+      const status = getCardMastery(!!record?.seen, record?.goodCount || 0);
+      quizMetrics[deckId][status]++;
     }
   });
 
@@ -62,14 +76,18 @@ const calculateDashboardStats = (
     m.progress = m.total > 0 ? Math.round((m.mastered / m.total) * 100) : 0;
   });
 
+  Object.keys(quizMetrics).forEach(id => {
+    const m = quizMetrics[id];
+    m.progress = m.total > 0 ? Math.round((m.mastered / m.total) * 100) : 0;
+  });
+
   let totalCards = 0;
   let masteredCount = 0;
   let seenCount = 0;
   let learningCount = 0;
 
-  // Re-iterate to calculate totals specifically for visible dashboard decks
   allCards.forEach(card => {
-    if (metrics[card.category]) { // Only count if deck is visible
+    if (metrics[card.category]) {
         totalCards++;
         const record = progress[card.id];
         if (record?.seen) {
@@ -101,6 +119,7 @@ const calculateDashboardStats = (
 
   return { 
     metrics, 
+    quizMetrics,
     overallMastery, 
     seenCount, 
     masteredCount,
@@ -112,12 +131,11 @@ const calculateDashboardStats = (
   };
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCustomSession, onOpenSearch, onOpenSettings }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCustomSession, onOpenSearch, onOpenSettings, onOpenQuiz }) => {
   const { allCards, progress, getCardMastery, lastSession } = useProgress();
   const { settings, updateSettings } = useSettings();
   const [greeting, setGreeting] = useState('Welcome');
   
-  // Time-aware greeting logic
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good Morning');
@@ -131,7 +149,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
   );
 
   const sortedDecks = useMemo(() => {
-    // Only show visible decks
     const list = DECK_LIST.filter(d => d.visibility.includes('dashboard'));
     if (settings.sortByLowest) {
       list.sort((a, b) => (stats.metrics[a.id]?.progress || 0) - (stats.metrics[b.id]?.progress || 0));
@@ -139,12 +156,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
     return list;
   }, [settings.sortByLowest, stats.metrics]);
 
+  const quizDecks = useMemo(() => {
+    return DECK_LIST.filter(d => d.visibility.includes('quiz'));
+  }, []);
+
   const handleStatusClick = (status: MasteryStatus) => {
     const targetIds = allCards.filter(c => {
-       // Filter by deck visibility first
        const isVisible = DECK_LIST.find(d => d.id === c.category)?.visibility.includes('dashboard');
        if (!isVisible) return false;
-
        const record = progress[c.id];
        return getCardMastery(!!record?.seen, record?.goodCount || 0) === status;
     }).map(c => c.id);
@@ -154,11 +173,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
     }
   };
 
-  const DomainCard: React.FC<{ deck: DeckConfig }> = ({ deck }) => {
-    const m = stats.metrics[deck.id];
+  const DomainCard: React.FC<{ deck: DeckConfig, isQuiz?: boolean }> = ({ deck, isQuiz = false }) => {
+    const m = isQuiz ? stats.quizMetrics[deck.id] : stats.metrics[deck.id];
     if (!m) return null;
 
     const renderLogo = () => {
+      if (isQuiz) {
+        switch (deck.id) {
+          case 'MEDSURG_SIGNS': return <Sparkles size={20} />;
+          case 'MNEMONICS': return <Command size={20} />;
+          case 'TRIADS_SYNDROMES': return <Target size={20} />;
+          default: return <Keyboard size={20} />;
+        }
+      }
       switch (deck.id) {
         case 'NP1': return <Waves size={20} />;
         case 'NP2': return <HeartPulse size={20} />;
@@ -171,41 +198,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
       }
     };
 
+    const accentColor = isQuiz ? 'text-indigo-500' : 'text-[var(--accent)]';
+    const accentBg = isQuiz ? 'group-hover:bg-indigo-500' : 'group-hover:bg-[var(--accent)]';
+    const progressBarColor = isQuiz ? 'bg-indigo-500' : 'bg-[var(--accent)]';
+
     return (
       <button 
-        onClick={() => onStartSession({ deckId: deck.id })}
+        onClick={() => isQuiz && onOpenQuiz ? onOpenQuiz(deck.id, 'browser') : onStartSession({ deckId: deck.id })}
         className="w-full p-5 rounded-3xl transition-all duration-300 flex flex-col gap-4 group text-left relative overflow-hidden
           bg-white dark:bg-darkcard/40 backdrop-blur-md
           border border-slate-200/80 dark:border-white/5
-          shadow-sm hover:shadow-lg hover:border-[var(--accent)]/40 hover:-translate-y-1 active:scale-[0.98]"
+          shadow-sm hover:shadow-lg hover:border-current/40 hover:-translate-y-1 active:scale-[0.98]"
+        style={{ color: isQuiz ? '#6366f1' : 'var(--accent)' }}
       >
         <div className="flex items-center justify-between w-full relative z-10">
-          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-[var(--accent)] group-hover:text-white transition-all duration-300 border border-slate-100 dark:border-white/5 shadow-sm">
+          <div className={`w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 ${accentBg} group-hover:text-white transition-all duration-300 border border-slate-100 dark:border-white/5 shadow-sm`}>
             {renderLogo()}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-black text-slate-300 dark:text-slate-600 tracking-widest uppercase">{deck.id}</span>
-            <div className="p-1 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-slate-400 group-hover:text-[var(--accent)] transition-all">
+            <div className={`p-1 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-slate-400 group-hover:${accentColor} transition-all`}>
               <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
         </div>
         
         <div className="space-y-3 relative z-10 w-full">
-          <h4 className="font-bold text-slate-800 dark:text-white text-sm leading-tight group-hover:text-[var(--accent)] transition-colors line-clamp-1">
+          <h4 className="font-bold text-slate-800 dark:text-white text-sm leading-tight group-hover:text-current transition-colors line-clamp-1">
             {deck.title}
           </h4>
           
           <div className="space-y-1.5">
              <div className="flex justify-between items-center px-0.5">
                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Mastery</span>
-                <span className="text-[9px] font-black text-[var(--accent)]">
+                <span className={`text-[9px] font-black ${accentColor}`}>
                   {m.progress}%
                 </span>
              </div>
              <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-[var(--accent)] transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(var(--accent-glow),0.5)]" 
+                  className={`h-full ${progressBarColor} transition-all duration-1000 ease-out`} 
                   style={{ width: `${m.progress}%` }} 
                 />
              </div>
@@ -216,34 +248,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-24 relative overflow-hidden">
-      {/* Background Ambience - Light Mode Only to preserve Dark Mode Deep Space */}
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-10 animate-fade-in pb-24 relative overflow-hidden">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--accent-soft),_transparent_50%)] pointer-events-none opacity-40 mix-blend-screen dark:hidden" />
 
-      {/* --- GRID LAYOUT START --- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative z-10">
         
-        {/* === LEFT COLUMN (Hero + Domains) === */}
-        <div className="lg:col-span-8 space-y-8">
+        <div className="lg:col-span-8 space-y-10">
           
-          {/* 1. HERO CARD */}
+          {/* HERO CARD */}
           <div className="relative group overflow-hidden rounded-[2.5rem] border shadow-2xl min-h-[220px] flex items-center transition-all duration-500
             bg-white border-white/20 
             dark:bg-slate-950 dark:border-[var(--accent)]/40 
             dark:shadow-[0_0_50px_rgba(var(--accent-rgb),0.15)]
           ">
-            {/* LIGHT MODE: Vibrant Gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-indigo-600 opacity-90 dark:opacity-0 transition-opacity duration-500" />
-            
-            {/* DARK MODE: Deep Space with Radial Glow */}
             <div className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_top_right,_rgba(var(--accent-rgb),0.25),_transparent_70%)]" />
-            
-            {/* Texture Overlay */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
             
             <div className="relative p-6 md:p-8 z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 w-full">
               <div className="flex-1 space-y-3 md:space-y-4 text-center md:text-left">
-                {/* Badge Row */}
                 <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
                    <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-white border border-white/20 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {stats.rank} Tier
@@ -255,7 +278,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
                    )}
                 </div>
                 
-                {/* Typography */}
                 <div className="space-y-2">
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[0.95] tracking-tight drop-shadow-md">
                     {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/60">Future RN!</span>
@@ -265,7 +287,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
                   </p>
                 </div>
 
-                {/* CTAs */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
                   <button 
                     onClick={() => lastSession?.setId ? onStartSession({}, true) : onStartSession({ deckId: 'NP1' })}
@@ -286,7 +307,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
                 </div>
               </div>
 
-              {/* Illustration */}
               <div className="hidden md:block relative w-40 h-40 shrink-0">
                  <div className="absolute inset-0 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm animate-[spin_60s_linear_infinite]" />
                  <div className="absolute inset-2 bg-white/5 rounded-full border border-white/10 animate-[spin_40s_linear_infinite_reverse]" />
@@ -297,21 +317,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
             </div>
           </div>
 
-          {/* 2. DOMAINS GRID */}
+          {/* KNOWLEDGE ARCHITECTURE SECTION */}
           <div className="space-y-6">
             <div className="flex items-center justify-between px-2">
               <h3 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
                 <Brain size={16} className="text-[var(--accent)]" /> Knowledge Architecture
               </h3>
               <div className="flex items-center gap-2">
-                {onOpenSearch && (
-                  <button 
-                    onClick={onOpenSearch}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-white/10 hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                  >
-                    <Search size={10} /> Find Topic
-                  </button>
-                )}
                 <button 
                   onClick={() => updateSettings({ sortByLowest: !settings.sortByLowest })}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${settings.sortByLowest ? 'bg-[var(--accent)] text-white border-transparent shadow-lg shadow-[var(--accent-glow)]' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-white/10'}`}
@@ -325,22 +337,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
               {sortedDecks.map(deck => <DomainCard key={deck.id} deck={deck} />)}
             </div>
           </div>
+
+          {/* ACTIVE RECALL PROTOCOLS SECTION */}
+          <div className="space-y-6 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
+             <div className="flex items-center justify-between px-2">
+                <h3 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                  <Keyboard size={16} className="text-indigo-500" /> Active Recall Protocols
+                </h3>
+             </div>
+             
+             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {quizDecks.map(deck => (
+                  <DomainCard key={deck.id} deck={deck} isQuiz />
+                ))}
+             </div>
+          </div>
         </div>
 
-        {/* === RIGHT COLUMN (Stats & Strategy) === */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
-          
-          {/* EXAM COUNTDOWN WIDGET */}
           <ExamCountdown onSetDate={() => onOpenSettings?.()} />
-
-          {/* DAILY GOAL WIDGET */}
           <DailyGoalWidget />
 
-          {/* 3. MASTERY WIDGET */}
           <div className="bg-white/80 dark:bg-darkcard/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-200/60 dark:border-white/5 shadow-soft relative overflow-hidden group">
              <div className="relative z-10 flex flex-col items-center text-center space-y-8">
-                
-                {/* Chart */}
                 <div className="relative">
                    <div className="w-48 h-48 rounded-full border-[12px] border-slate-100 dark:border-slate-800 flex items-center justify-center shadow-inner">
                       <div className="text-center">
@@ -362,26 +381,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
                    </svg>
                 </div>
 
-                {/* Metrics Row (Clickable) */}
                 <div className="grid grid-cols-3 gap-3 w-full border-t border-slate-100 dark:border-white/5 pt-6">
-                   <button 
-                     onClick={() => handleStatusClick('mastered')}
-                     className="p-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 hover:scale-105 active:scale-95 transition-all"
-                   >
+                   <button onClick={() => handleStatusClick('mastered')} className="p-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 hover:scale-105 active:scale-95 transition-all">
                       <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{stats.masteredCount}</div>
                       <div className="text-[7px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Mastered</div>
                    </button>
-                   <button 
-                     onClick={() => handleStatusClick('learning')}
-                     className="p-2 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20 hover:scale-105 active:scale-95 transition-all"
-                   >
+                   <button onClick={() => handleStatusClick('learning')} className="p-2 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20 hover:scale-105 active:scale-95 transition-all">
                       <div className="text-xl font-black text-amber-600 dark:text-amber-500">{stats.learningCount}</div>
                       <div className="text-[7px] font-black text-amber-600/70 dark:text-amber-500/70 uppercase tracking-widest">Learning</div>
                    </button>
-                   <button 
-                     onClick={() => handleStatusClick('unseen')}
-                     className="p-2 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all"
-                   >
+                   <button onClick={() => handleStatusClick('unseen')} className="p-2 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all">
                       <div className="text-xl font-black text-slate-800 dark:text-white">{stats.unseenCount}</div>
                       <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Unseen</div>
                    </button>
@@ -395,25 +404,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
                 </button>
              </div>
              
-             {/* BG Deco */}
              <div className="absolute top-[-10%] right-[-10%] opacity-[0.03] text-slate-900 dark:text-white pointer-events-none">
                 <Trophy size={200} />
              </div>
           </div>
 
-          {/* 4. CLINICAL PROTOCOL CARD (Fully Responsive) */}
           <div className="relative overflow-hidden rounded-[2.5rem] p-8 border transition-all duration-300
             bg-white border-indigo-100 shadow-sm
             dark:bg-darkcard/60 dark:border-indigo-500/20 dark:shadow-[0_0_30px_rgba(99,102,241,0.1)]
           ">
-              {/* Light Mode Glow Effect (Subtle) */}
               <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none opacity-60 dark:hidden" />
-
-              {/* Dark Mode Glow Effect */}
               <div className="hidden dark:block absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none" />
 
               <div className="flex items-center gap-4 mb-6 relative z-10">
-                 {/* Icon Container: Dark/Light Adaptive */}
                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg 
                     bg-indigo-600 text-white shadow-indigo-200
                     dark:bg-indigo-500/20 dark:text-indigo-400 dark:shadow-none
@@ -437,7 +440,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onOpenCust
 
         </div>
       </div>
-      {/* --- GRID LAYOUT END --- */}
     </div>
   );
 };

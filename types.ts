@@ -2,7 +2,7 @@
 export interface Flashcard {
   id: string;
   deckId: string;
-  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
+  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS" | "MNEMONICS" | "TRIADS_SYNDROMES";
   setId: string;
   setName?: string;
   setDescription?: string;
@@ -92,7 +92,7 @@ export interface DeckIdStats {
   progress: number;
 }
 
-export type DeckId = "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
+export type DeckId = "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS" | "MNEMONICS" | "TRIADS_SYNDROMES";
 
 export interface DeckConfig {
   id: DeckId;
@@ -108,7 +108,7 @@ export interface SetMetadata {
   setName: string;
   setDescription: string;
   setTags: string[];
-  np: "NP1" | "NP2" | "NP3" | "NP4" | "NP5" | "PHARM_LABS" | "PRIO_DEL" | "MEDSURG_SIGNS";
+  np: DeckId;
   totalCards: number;
 }
 

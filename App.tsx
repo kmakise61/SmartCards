@@ -5,7 +5,7 @@ import { Topbar } from './components/Topbar';
 import { Dashboard } from './pages/Dashboard';
 import { Flashcards } from './pages/Flashcards';
 import { Analytics } from './pages/Analytics';
-import { QuizMode } from './pages/QuizMode'; // Import QuizMode
+import { QuizMode } from './pages/QuizMode';
 import { ViewState, SessionFilters } from './types';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ProgressProvider, useProgress } from './context/ProgressContext';
@@ -571,6 +571,8 @@ const MainContent: React.FC = () => {
   const [flashcardFilters, setFlashcardFilters] = useState<SessionFilters | undefined>(undefined);
   const [isResuming, setIsResuming] = useState(false);
   const [flashcardsKey, setFlashcardsKey] = useState(0);
+  const [quizDeckId, setQuizDeckId] = useState<string | undefined>(undefined);
+  const [quizInitialPhase, setQuizInitialPhase] = useState<'setup' | 'active' | 'browser'>('setup');
   
   // Use the hook to check connection
   const isOnline = useOnlineStatus();
@@ -613,6 +615,13 @@ const MainContent: React.FC = () => {
     setFlashcardsKey(prev => prev + 1);
   };
 
+  const handleStartQuiz = (deckId: string, phase: 'setup' | 'active' | 'browser' = 'browser') => {
+    setQuizDeckId(deckId);
+    setQuizInitialPhase(phase);
+    setCurrentView('quiz');
+    setIsSidebarCollapsed(true);
+  };
+
   const handleCustomSessionStart = (cardIds: string[]) => {
     startSession({ cardIds });
   };
@@ -625,6 +634,8 @@ const MainContent: React.FC = () => {
     // Clear sub-view state and force component remount via key
     setFlashcardFilters(undefined);
     setIsResuming(false);
+    setQuizDeckId(undefined);
+    setQuizInitialPhase('setup');
     setFlashcardsKey(prev => prev + 1);
     
     setCurrentView(view);
@@ -667,6 +678,7 @@ const MainContent: React.FC = () => {
             <div className="h-full overflow-y-auto">
               <Dashboard 
                 onStartSession={startSession} 
+                onOpenQuiz={handleStartQuiz}
                 onOpenCustomSession={() => setIsCustomSessionOpen(true)}
                 onOpenSearch={() => setIsSearchOpen(true)}
                 onOpenSettings={() => setIsSettingsOpen(true)}
@@ -678,7 +690,7 @@ const MainContent: React.FC = () => {
             </div>
           ) : currentView === 'quiz' ? (
             <div className="h-full overflow-y-auto">
-              <QuizMode onExit={() => handleViewChange('dashboard')} />
+              <QuizMode key={quizDeckId} initialDeckId={quizDeckId} initialPhase={quizInitialPhase} onExit={() => handleViewChange('dashboard')} />
             </div>
           ) : (
             <Flashcards 

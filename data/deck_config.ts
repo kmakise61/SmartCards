@@ -55,11 +55,27 @@ export const DECKS: Record<DeckId, DeckConfig> = {
   },
   MEDSURG_SIGNS: {
     id: "MEDSURG_SIGNS",
-    title: "Clinical Signs & Triads",
-    subtitle: "Pathognomonic Gizmos",
-    description: "Master high-yield signs, syndromes, and triads using active recall cloze deletion strategy.",
+    title: "Pathognomonic Signs",
+    subtitle: "Hallmark Indicators",
+    description: "Master high-yield pathognomonic signs and clinical hallmarks using active recall cloze deletion strategy.",
     isSupplemental: true,
-    visibility: ['quiz'] // Only visible in Active Recall mode
+    visibility: ['quiz']
+  },
+  MNEMONICS: {
+    id: "MNEMONICS",
+    title: "High-Yield Mnemonics",
+    subtitle: "Board Exam Shortcuts",
+    description: "Master critical clinical acronyms like CAUTION, MONA, and REEDA through active recall.",
+    isSupplemental: true,
+    visibility: ['quiz']
+  },
+  TRIADS_SYNDROMES: {
+    id: "TRIADS_SYNDROMES",
+    title: "Triads & Syndromes",
+    subtitle: "Clinical Patterns",
+    description: "Master classic medical triads and syndromes (e.g., Cushing's, Beck's, Virchow's) to sharpen diagnostic speed.",
+    isSupplemental: true,
+    visibility: ['quiz']
   }
 };
 

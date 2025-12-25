@@ -392,7 +392,7 @@ export const Flashcards: React.FC<{
         {viewMode === 'browser' && selectedSetId && (
           <CardBrowser 
             setId={selectedSetId} 
-            onBack={() => setViewMode('sets')} 
+            onBack={handleBack} 
             isSidebarOpen={!isFocusMode}
             onStudy={(filters) => {
               const startIdx = filters?.startIndex || 0;
@@ -401,7 +401,7 @@ export const Flashcards: React.FC<{
               } else if (filters?.setId) {
                 initializeStudySession(filters.setId, startIdx, filters.mastery, undefined, filters?.shuffle);
               } else {
-                initializeStudySession(selectedSetId, 0, undefined, undefined, filters?.shuffle);
+                initializeStudySession(selectedSetId || null, 0, undefined, undefined, filters?.shuffle);
               }
             }}
           />
@@ -670,7 +670,7 @@ export const Flashcards: React.FC<{
                     isRated && !settings.autoAdvance ? (
                       <button 
                         onClick={goToNextCard}
-                        className="w-full h-full bg-emerald-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-3xl shadow-glow flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 hover:scale-[1.02] active:scale-95 transition-all"
+                        className="w-full h-full bg-emerald-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-3xl shadow-glow flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
                       >
                         NEXT <ArrowRight size={20} strokeWidth={3} />
                       </button>
